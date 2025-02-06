@@ -1,16 +1,14 @@
-# Compiled class file
+# ==========================
+# General Java Ignored Files
+# ==========================
 *.class
-
-# Log file
 *.log
-
-# BlueJ files
 *.ctxt
+*.mtj.tmp/
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
+# ==========================
+# Package Files (Binaries)
+# ==========================
 *.jar
 *.war
 *.nar
@@ -19,6 +17,40 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# ==========================
+# JVM Crash Logs
+# ==========================
 hs_err_pid*
 replay_pid*
+
+# ==========================
+# Maven Specific Ignored Files
+# ==========================
+target/
+!target/*.keep
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ==========================
+# Eclipse Specific Ignored Files
+# ==========================
+*.classpath
+*.project
+*.settings/
+bin/
+tmp/
+
+# ==========================
+# IntelliJ IDEA Specific Files
+# ==========================
+.idea/
+*.iml
+*.iws
+out/
