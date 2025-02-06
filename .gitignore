@@ -54,3 +54,14 @@ tmp/
 *.iml
 *.iws
 out/
+
+# Ignorar archivos y carpetas de Eclipse
+.classpath
+.project
+.settings/
+
+# Ignorar Maven Wrapper
+.mvn/
+
+# Ignorar la carpeta de compilación de Maven
+target/
