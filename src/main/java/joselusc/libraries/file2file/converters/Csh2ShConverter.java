@@ -217,11 +217,20 @@ public class Csh2ShConverter implements Converter {
             return "export " + setenvMatcher.group(1) + "=" + setenvMatcher.group(2);
         }
 
-        // set VAR = VALUE -> VAR=VALUE
+        // set VAR = VALUE -> VAR=VALUE (preserve quotes if present)
         Pattern setPattern = Pattern.compile("^set\\s+(\\S+)\\s*=\\s*(.+)");
         Matcher setMatcher = setPattern.matcher(trimmed);
         if (setMatcher.find()) {
-            return setMatcher.group(1) + "=" + setMatcher.group(2);
+            String var = setMatcher.group(1);
+            String val = setMatcher.group(2).trim();
+            // If value is quoted, keep quotes; if not, add quotes if it contains spaces
+            if ((val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"))) {
+                return var + "=" + val;
+            } else if (val.contains(" ")) {
+                return var + "=\"" + val + "\"";
+            } else {
+                return var + "=" + val;
+            }
         }
 
         // cd path -> cd "path" (if not already quoted)
@@ -231,29 +240,45 @@ public class Csh2ShConverter implements Converter {
             return "cd \"" + cdMatcher.group(1).trim() + "\"";
         }
 
+        // Detecta: if ($var == valor) goto label
+        Pattern ifGotoPattern = Pattern.compile("^if\\s*\\((.+)\\)\\s*goto\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$");
+        Matcher ifGotoMatcher = ifGotoPattern.matcher(trimmed);
+        if (ifGotoMatcher.find()) {
+            String condition = ifGotoMatcher.group(1).trim();
+            String label = ifGotoMatcher.group(2).trim();
+            // Convierte la condición CSH a Bash
+            String bashCondition = bashifyCondition(condition);
+            return "if [ " + bashCondition + " ]; then\n" +
+                label + "  # goto replaced by function call\n" +
+                "fi";
+        }
+
         // if !(condition) then -> if [ ! condition ]; then
         Pattern ifNegPattern = Pattern.compile("^if\\s*!\\(\\s*(.+?)\\s*\\)\\s*then");
         Matcher ifNegMatcher = ifNegPattern.matcher(trimmed);
         if (ifNegMatcher.find()) {
             String condition = ifNegMatcher.group(1);
-            condition = condition.replaceAll("(-[a-zA-Z])\\s+(\\S+)", "$1 \"$2\"");
-            return "if [ ! " + condition + " ]; then";
+            return "if [ ! " + bashifyCondition(condition) + " ]; then";
         }
 
         // if ($VAR == VALUE) then -> if [ "$VAR" = "VALUE" ]; then
-        Pattern ifPattern = Pattern.compile("^if\\s*\\(\\s*\\$?(\\S+)\\s*(==|!=)\\s*(\\S+)\\s*\\)\\s*then");
+        Pattern ifPattern = Pattern.compile("^if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
         Matcher ifMatcher = ifPattern.matcher(trimmed);
         if (ifMatcher.find()) {
-            String operator = ifMatcher.group(2).equals("==") ? "=" : "!=";
-            return "if [ \"" + ifMatcher.group(1) + "\" " + operator + " \"" + ifMatcher.group(3) + "\" ]; then";
+            String var = ifMatcher.group(1);
+            String op = ifMatcher.group(2).equals("==") ? "=" : ifMatcher.group(2);
+            String val = ifMatcher.group(3).replaceAll("^['\"]|['\"]$", "");
+            return "if [ \"$" + var + "\" " + op + " \"" + val + "\" ]; then";
         }
 
         // else if ($VAR == VALUE) then -> elif [ "$VAR" = "VALUE" ]; then
-        Pattern elseIfPattern = Pattern.compile("^else\\s+if\\s*\\(\\s*\\$?(\\S+)\\s*(==|!=)\\s*(\\S+)\\s*\\)\\s*then");
+        Pattern elseIfPattern = Pattern.compile("^else\\s+if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
         Matcher elseIfMatcher = elseIfPattern.matcher(trimmed);
         if (elseIfMatcher.find()) {
-            String operator = elseIfMatcher.group(2).equals("==") ? "=" : "!=";
-            return "elif [ \"" + elseIfMatcher.group(1) + "\" " + operator + " \"" + elseIfMatcher.group(3) + "\" ]; then";
+            String var = elseIfMatcher.group(1);
+            String op = elseIfMatcher.group(2).equals("==") ? "=" : elseIfMatcher.group(2);
+            String val = elseIfMatcher.group(3).replaceAll("^['\"]|['\"]$", "");
+            return "elif [ \"$" + var + "\" " + op + " \"" + val + "\" ]; then";
         }
 
         // else
@@ -271,11 +296,7 @@ public class Csh2ShConverter implements Converter {
         Matcher whileMatcher = whilePattern.matcher(trimmed);
         if (whileMatcher.find() && trimmed.endsWith(")")) {
             String condition = whileMatcher.group(1);
-            condition = condition.replaceAll("\\$?(\\w+)\\s*<\\s*(\\w+)", "\"\\$$1\" -lt \"$2\"");
-            condition = condition.replaceAll("\\$?(\\w+)\\s*>\\s*(\\w+)", "\"\\$$1\" -gt \"$2\"");
-            condition = condition.replaceAll("\\$?(\\w+)\\s*==\\s*(\\w+)", "\"\\$$1\" = \"$2\"");
-            condition = condition.replaceAll("\\$?(\\w+)\\s*!=\\s*(\\w+)", "\"\\$$1\" != \"$2\"");
-            return "while [ " + condition + " ]; do";
+            return "while [ " + bashifyCondition(condition) + " ]; do";
         }
 
         // foreach VAR (LIST) -> for VAR in LIST; do
@@ -327,7 +348,8 @@ public class Csh2ShConverter implements Converter {
         if (aliasMatcher.find()) {
             String name = aliasMatcher.group(1);
             String value = aliasMatcher.group(2).trim();
-            if (!value.startsWith("'") && value.contains(" ")) {
+            // Always quote the value for Bash
+            if (!value.startsWith("'") && !value.startsWith("\"")) {
                 value = "'" + value + "'";
             }
             return "alias " + name + "=" + value;
@@ -339,10 +361,13 @@ public class Csh2ShConverter implements Converter {
         // goto label or goto $var
         if (trimmed.startsWith("goto ")) {
             String label = trimmed.substring(5).trim();
-            if (label.startsWith("$")) {
+            // In Bash, goto is not supported. We can call the function if label exists.
+            if (label.matches("^[A-Za-z_][A-Za-z0-9_]*$")) {
+                return label + "  # goto replaced by function call\nreturn";
+            } else if (label.startsWith("$")) {
                 return "eval \"" + label + "\"\nreturn";
             } else {
-                return label + "\nreturn";
+                return "# goto " + label + " (not supported in Bash)";
             }
         }
 
@@ -363,8 +388,29 @@ public class Csh2ShConverter implements Converter {
             return ". " + trimmed.substring(7).trim();
         }
 
+        // Llamada a label como función (si la línea es solo el nombre de la label)
+        if (trimmed.matches("^[A-Za-z_][A-Za-z0-9_]*$")) {
+            return trimmed + "  # possible function call";
+        }
+
         // Fallback: return the line as-is
         return trimmed;
+    }
+
+    /**
+     * Converts a CSH condition to a Bash-compatible condition for use in [ ... ].
+     * Handles ==, !=, <, >, -eq, -ne, etc.
+     *
+     * @param cond the CSH condition string
+     * @return the Bash-compatible condition string
+     */
+    private String bashifyCondition(String cond) {
+        // Replace == and != with Bash equivalents
+        cond = cond.replaceAll("\\$?(\\w+)\\s*==\\s*([\"']?\\w+[\"']?)", "\"\\$$1\" = $2");
+        cond = cond.replaceAll("\\$?(\\w+)\\s*!=\\s*([\"']?\\w+[\"']?)", "\"\\$$1\" != $2");
+        cond = cond.replaceAll("\\$?(\\w+)\\s*<\\s*(\\w+)", "\"\\$$1\" -lt \"$2\"");
+        cond = cond.replaceAll("\\$?(\\w+)\\s*>\\s*(\\w+)", "\"\\$$1\" -gt \"$2\"");
+        return cond;
     }
 
     /**

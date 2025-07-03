@@ -6,7 +6,7 @@
 
     <groupId>joselusc.libraries</groupId>
     <artifactId>file2file</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.2-SNAPSHOT</version>
     <name>file2file</name>
     <url>http://www.example.com</url>
 
@@ -85,7 +85,7 @@
                     <configuration>
                         <archive>
                             <manifest>
-                                <mainClass>joselusc.libraries.file2file.FileConverter</mainClass>
+                                <mainClass>joselusc.libraries.file2file.gui.File2FileGUI</mainClass>
                             </manifest>
                         </archive>
                     </configuration>

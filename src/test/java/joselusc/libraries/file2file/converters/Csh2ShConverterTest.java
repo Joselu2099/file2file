@@ -62,7 +62,7 @@ class Csh2ShConverterTest {
 
         assertTrue(shContent.contains("#!/bin/bash"));
         assertTrue(shContent.contains("export VAR=valor"));
-        assertTrue(shContent.contains("if [ \"VAR\" = \"valor\" ]; then"));
+        assertTrue(shContent.contains("if [ \"$VAR\" = \"valor\" ]; then"));
         assertTrue(shContent.contains("fi"));
     }
 
@@ -239,4 +239,5 @@ class Csh2ShConverterTest {
         });
         assertTrue(ex.getMessage().contains("does not exist"));
     }
+
 }
