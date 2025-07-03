@@ -65,3 +65,6 @@ out/
 
 # Ignorar la carpeta de compilación de Maven
 target/
+
+.DS_Store
+Thumbs.db

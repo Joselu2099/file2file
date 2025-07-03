@@ -11,47 +11,54 @@ import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import joselusc.libraries.file2file.Converter;
+import joselusc.libraries.file2file.converters.interfaces.Converter;
 
 /**
- * Converts CSH scripts into Bash (SH) scripts with various transformations:
- * <ul>
- * <li>Adds the shebang line "#!/bin/bash" if it is not already present.</li>
- * <li>Attempts to preserve indentation, blank lines, and whitespace as much as
- * possible.</li>
- * <li>Converts common CSH constructs (e.g. <code>if</code>, <code>while</code>,
- * <code>foreach</code>, <code>switch</code>, <code>alias</code>,
- * <code>goto</code>) into their Bash equivalents.</li>
- * <li>Performs a best-effort approach to handle various CSH features, but
- * complete compatibility is not guaranteed due to inherent differences between
- * CSH and Bash.</li>
- * </ul>
- *
+ * {@code Csh2ShConverter} is a singleton class that provides functionality to convert
+ * C shell (CSH) scripts into Bash (SH) scripts. The conversion process includes
+ * translation of common CSH constructs (such as if, while, foreach, switch, alias, goto)
+ * into their Bash equivalents, as well as preservation of indentation, blank lines,
+ * and comments.
  * <p>
- * Note that certain CSH features (especially those involving complex
- * <code>goto</code> usage or advanced alias parameters) may require additional
- * manual review in the resulting Bash script.
+ * The converter performs a best-effort transformation, but due to differences between
+ * CSH and Bash, some advanced or complex CSH features may require manual review
+ * after conversion.
  * </p>
+ * <h2>Supported Features</h2>
+ * <ul>
+ *   <li>Automatic insertion of the Bash shebang line (<code>#!/bin/bash</code>).</li>
+ *   <li>Preservation of indentation, blank lines, and comments.</li>
+ *   <li>Translation of CSH control structures (if, else, endif, while, foreach, switch/case, etc.).</li>
+ *   <li>Conversion of variable assignments and environment settings.</li>
+ *   <li>Support for alias and unalias commands.</li>
+ *   <li>Translation of goto statements and label handling.</li>
+ *   <li>Support for source/include statements.</li>
+ *   <li>Conversion of backtick command substitutions to <code>$(...)</code> syntax.</li>
+ * </ul>
+ * <p>
+ * <b>Note:</b> Some CSH features (such as advanced goto usage or complex alias definitions)
+ * may not be fully compatible and should be reviewed manually in the resulting Bash script.
+ * </p>
+ *
+ * @author joselusc
  */
 public class Csh2ShConverter implements Converter {
 
     /**
-     * Singleton instance to enforce a single converter usage pattern.
+     * Singleton instance of the converter.
      */
     private static Csh2ShConverter instance;
 
     /**
-     * Prevents direct instantiation from outside. Use {@link #getInstance()}
-     * instead.
+     * Private constructor to enforce singleton pattern.
      */
     private Csh2ShConverter() {
     }
 
     /**
-     * Retrieves (and creates if necessary) the singleton instance of
-     * {@code Csh2ShConverter}.
+     * Returns the singleton instance of {@code Csh2ShConverter}.
      *
-     * @return the shared converter instance
+     * @return the singleton instance
      */
     public static synchronized Csh2ShConverter getInstance() {
         if (instance == null) {
@@ -61,57 +68,54 @@ public class Csh2ShConverter implements Converter {
     }
 
     /**
-     * Flag indicating whether the converter is currently inside a function
-     * block in the CSH-to-Bash translation process. This is reset whenever a
-     * new label (function) is opened, or an existing function is closed.
+     * Indicates whether the converter is currently inside a function block
+     * during the translation process. This is used to properly close function
+     * definitions when converting labels and goto statements.
      */
     private boolean functionBlockOpen = false;
 
     /**
-     * Converts an input file with a {@code .csh} extension into a Bash script
-     * with a {@code .sh} suffix. The resulting file is written in the same
-     * directory as the input, with various transformations to adapt CSH syntax
-     * into Bash.
+     * Converts a CSH script file (with a <code>.csh</code> extension) to a Bash script
+     * (with a <code>.sh</code> extension). The output file is created in the same directory
+     * as the input file, with the same base name and a <code>.sh</code> extension.
      *
-     * @param inputCshFile the path of the <code>.csh</code> file to convert
-     * @return a {@link File} object corresponding to the newly created
-     * <code>.sh</code> file
-     * @throws IOException if any file I/O error occurs
-     * @throws FileNotFoundException if {@code inputCshFile} does not exist
-     * @throws IllegalArgumentException if {@code inputCshFile} does not end
-     * with <code>.csh</code>
+     * @param inputCshFile the path to the input CSH script file
+     * @return a {@link File} object representing the generated Bash script
+     * @throws IOException if an I/O error occurs during reading or writing
+     * @throws FileNotFoundException if the input file does not exist
+     * @throws IllegalArgumentException if the input file does not have a <code>.csh</code> extension
      */
     @Override
     public File convert(String inputCshFile) throws IOException {
         File inputFile = new File(inputCshFile);
+
+        if (!inputFile.getName().endsWith(".csh")) {
+            throw new IllegalArgumentException("Expected a .csh file");
+        }
         if (!inputFile.exists()) {
             throw new FileNotFoundException("Input file does not exist: " + inputCshFile);
         }
-        if (!inputFile.getName().endsWith(".csh")) {
-            throw new IllegalArgumentException("Expected a .csh file: " + inputCshFile);
-        }
 
-        // Generate the output file name by replacing .csh with .sh
         String outputFileName = inputFile.getName().replaceFirst("\\.csh$", ".sh");
         File outputFile = new File(inputFile.getParent(), outputFileName);
         Path inPath = inputFile.toPath();
         Path outPath = outputFile.toPath();
 
-        // Reset state for each conversion
         functionBlockOpen = false;
 
-        try (BufferedReader reader = Files.newBufferedReader(inPath, StandardCharsets.UTF_8); BufferedWriter writer = Files.newBufferedWriter(outPath, StandardCharsets.UTF_8)) {
+        try (BufferedReader reader = Files.newBufferedReader(inPath, StandardCharsets.UTF_8);
+             BufferedWriter writer = Files.newBufferedWriter(outPath, StandardCharsets.UTF_8)) {
 
-            // Write out the shebang for Bash
+            // Write the Bash shebang line
             writer.write("#!/bin/bash\n");
 
             boolean firstLineProcessed = false;
             String line;
             while ((line = reader.readLine()) != null) {
-                // Remove potential carriage returns to ensure proper LF endings
+                // Normalize line endings
                 line = line.replace("\r", "");
 
-                // Skip the first line if it was a CSH-style shebang (e.g. #!/bin/csh)
+                // Skip the original CSH shebang line
                 if (!firstLineProcessed) {
                     firstLineProcessed = true;
                     if (line.trim().startsWith("#!")) {
@@ -125,10 +129,9 @@ public class Csh2ShConverter implements Converter {
                     continue;
                 }
 
-                // Convert one line of CSH code into Bash code
+                // Convert the current line and write the result
                 String converted = convertLine(line);
                 if (!converted.isEmpty()) {
-                    // The conversion may produce multiple sub-lines
                     for (String subLine : converted.split("\n")) {
                         writer.write(subLine);
                         writer.write("\n");
@@ -136,7 +139,7 @@ public class Csh2ShConverter implements Converter {
                 }
             }
 
-            // If we ended in the middle of a function block, close it properly
+            // Close any open function block at the end of the file
             if (functionBlockOpen) {
                 writer.write("}\n");
             }
@@ -146,32 +149,25 @@ public class Csh2ShConverter implements Converter {
     }
 
     /**
-     * Splits the given line into indentation and content. Removes the
-     * indentation from the beginning, converts the remaining content to Bash,
-     * then reapplies the original indentation to each line of the conversion
-     * result.
+     * Converts a single line of a CSH script, preserving its original indentation.
+     * The method extracts the indentation, applies the conversion logic to the
+     * content, and then reapplies the indentation to each resulting line.
      *
-     * @param line a single line of the original .csh script
-     * @return a potentially multi-line string with converted Bash code plus
-     * preserved indentation
+     * @param line the original line from the CSH script
+     * @return the converted Bash line(s) with preserved indentation
      */
     private String convertLine(String line) {
-        // Extract indentation
         String indent = getIndent(line);
-        // Remove indentation from the front
         String trimmed = line.substring(indent.length());
 
-        // Replace backticks with $(...) syntax in Bash
         trimmed = migrateBackticks(trimmed);
 
-        // Perform the main logic to convert from CSH to Bash
         String result = convertLineLogic(trimmed);
 
         if (result.isEmpty()) {
             return "";
         }
 
-        // Reapply the indentation to each new line produced by the conversion
         StringBuilder sb = new StringBuilder();
         String[] parts = result.split("\n");
         for (int i = 0; i < parts.length; i++) {
@@ -184,90 +180,67 @@ public class Csh2ShConverter implements Converter {
     }
 
     /**
-     * Applies the set of translation rules to convert the content of a single
-     * line from CSH syntax to Bash syntax.
+     * Applies the main set of translation rules to convert a single line of CSH code
+     * (without indentation) to its Bash equivalent.
      * <p>
-     * Includes:
+     * Supported conversions include:
      * <ul>
-     * <li>Removing CSH shebang lines.</li>
-     * <li>Handling block comments (<code>: <<'END'</code> ...
-     * <code>END</code>).</li>
-     * <li>Converting <code>setenv</code> to <code>export</code>.</li>
-     * <li>Translating <code>set var = value</code> into
-     * <code>var=value</code>.</li>
-     * <li>Adapting <code>cd path</code> into <code>cd \"path\"</code> if
-     * unquoted.</li>
-     * <li>Mapping <code>if !( condition ) then</code> into
-     * <code>if [ ! condition ]; then</code>.</li>
-     * <li>Translating <code>if ($VAR == VALUE) then</code> (or !=) into Bash
-     * <code>if [ ... ]; then</code>.</li>
-     * <li>Turning <code>else if</code> into <code>elif</code>,
-     * <code>endif</code> into <code>fi</code>, <code>end</code> into
-     * <code>done</code>.</li>
-     * <li>Converting <code>while ( condition )</code> into
-     * <code>while [ condition ]; do</code>, <code>foreach var (list)</code>
-     * into <code>for var in list; do</code>.</li>
-     * <li>Switch-case constructs
-     * (<code>switch ... case ... breaksw ... endsw</code>) become
-     * <code>case ... esac</code> in Bash.</li>
-     * <li>Alias definitions and <code>unalias</code> are preserved/adapted
-     * accordingly.</li>
-     * <li><code>goto label</code> becomes a function call with
-     * <code>; return</code>. For dynamic labels (<code>goto $f_next</code>), it
-     * uses <code>eval</code>.</li>
-     * <li>Detecting labels (<code>MyLabel:</code>) transforms them into Bash
-     * functions (<code>MyLabel() { ... }</code>) and closes any existing
-     * function block if open.</li>
-     * <li><code>source file</code> becomes <code>. file</code>.</li>
+     *   <li>CSH shebang removal</li>
+     *   <li>Block comment markers</li>
+     *   <li>setenv and set variable assignments</li>
+     *   <li>cd command quoting</li>
+     *   <li>if/else/endif/while/foreach/switch/case constructs</li>
+     *   <li>alias and unalias commands</li>
+     *   <li>goto and label handling</li>
+     *   <li>source/include statements</li>
+     *   <li>Fallback: returns the line as-is if no rule matches</li>
      * </ul>
      *
-     * @param trimmed a single line of code, without its original indentation
-     * @return the transformed Bash equivalent (possibly empty if the line is
-     * removed)
+     * @param trimmed the line content without indentation
+     * @return the converted Bash line(s), or an empty string if the line should be omitted
      */
     private String convertLineLogic(String trimmed) {
-        // 1. Remove csh shebang lines
+        // Remove CSH shebang lines
         if (trimmed.startsWith("#!")) {
             return "";
         }
 
-        // 2. Keep lines like ": <<'END'" or "END" (block comment markers)
+        // Preserve block comment markers
         if (trimmed.startsWith(": <<'END'") || trimmed.equals("END")) {
             return trimmed;
         }
 
-        // 3. setenv var value -> export var=value
+        // setenv VAR VALUE -> export VAR=VALUE
         Pattern setenvPattern = Pattern.compile("^setenv\\s+(\\S+)\\s+(\\S+)");
         Matcher setenvMatcher = setenvPattern.matcher(trimmed);
         if (setenvMatcher.find()) {
             return "export " + setenvMatcher.group(1) + "=" + setenvMatcher.group(2);
         }
 
-        // 4. set VAR = VALUE -> VAR=VALUE
+        // set VAR = VALUE -> VAR=VALUE
         Pattern setPattern = Pattern.compile("^set\\s+(\\S+)\\s*=\\s*(.+)");
         Matcher setMatcher = setPattern.matcher(trimmed);
         if (setMatcher.find()) {
             return setMatcher.group(1) + "=" + setMatcher.group(2);
         }
 
-        // 5. cd path -> cd "path" (if unquoted)
+        // cd path -> cd "path" (if not already quoted)
         Pattern cdPattern = Pattern.compile("^cd\\s+([^\"].+)$");
         Matcher cdMatcher = cdPattern.matcher(trimmed);
         if (cdMatcher.find()) {
-            return "cd \"" + cdMatcher.group(1) + "\"";
+            return "cd \"" + cdMatcher.group(1).trim() + "\"";
         }
 
-        // 6. if !( condition ) then -> if [ ! condition ]; then
+        // if !(condition) then -> if [ ! condition ]; then
         Pattern ifNegPattern = Pattern.compile("^if\\s*!\\(\\s*(.+?)\\s*\\)\\s*then");
         Matcher ifNegMatcher = ifNegPattern.matcher(trimmed);
         if (ifNegMatcher.find()) {
             String condition = ifNegMatcher.group(1);
-            // Attempt to quote arguments if it detects operators like -e
             condition = condition.replaceAll("(-[a-zA-Z])\\s+(\\S+)", "$1 \"$2\"");
             return "if [ ! " + condition + " ]; then";
         }
 
-        // 7. if ($VAR == VALUE) then -> if [ "$VAR" = "VALUE" ]; then
+        // if ($VAR == VALUE) then -> if [ "$VAR" = "VALUE" ]; then
         Pattern ifPattern = Pattern.compile("^if\\s*\\(\\s*\\$?(\\S+)\\s*(==|!=)\\s*(\\S+)\\s*\\)\\s*then");
         Matcher ifMatcher = ifPattern.matcher(trimmed);
         if (ifMatcher.find()) {
@@ -275,7 +248,7 @@ public class Csh2ShConverter implements Converter {
             return "if [ \"" + ifMatcher.group(1) + "\" " + operator + " \"" + ifMatcher.group(3) + "\" ]; then";
         }
 
-        // 7.1 else if
+        // else if ($VAR == VALUE) then -> elif [ "$VAR" = "VALUE" ]; then
         Pattern elseIfPattern = Pattern.compile("^else\\s+if\\s*\\(\\s*\\$?(\\S+)\\s*(==|!=)\\s*(\\S+)\\s*\\)\\s*then");
         Matcher elseIfMatcher = elseIfPattern.matcher(trimmed);
         if (elseIfMatcher.find()) {
@@ -283,54 +256,59 @@ public class Csh2ShConverter implements Converter {
             return "elif [ \"" + elseIfMatcher.group(1) + "\" " + operator + " \"" + elseIfMatcher.group(3) + "\" ]; then";
         }
 
-        // 7.2 else
+        // else
         if (trimmed.matches("^else\\s*$")) {
             return "else";
         }
 
-        // 8. endif -> fi
+        // endif -> fi
         if (trimmed.equals("endif")) {
             return "fi";
         }
 
-        // 9. while ( condition ) -> while [ condition ]; do
+        // while (condition) -> while [ condition ]; do
         Pattern whilePattern = Pattern.compile("^while\\s*\\(\\s*(.+?)\\s*\\)\\s*");
         Matcher whileMatcher = whilePattern.matcher(trimmed);
         if (whileMatcher.find() && trimmed.endsWith(")")) {
             String condition = whileMatcher.group(1);
-            // Basic replacements for <, >, ==, !=
-            condition = condition.replaceAll("\\$?(\\S+)\\s*<\\s*(\\S+)", "\"$1\" -lt \"$2\"");
-            condition = condition.replaceAll("\\$?(\\S+)\\s*>\\s*(\\S+)", "\"$1\" -gt \"$2\"");
-            condition = condition.replaceAll("\\$?(\\S+)\\s*==\\s*(\\S+)", "\"$1\" = \"$2\"");
-            condition = condition.replaceAll("\\$?(\\S+)\\s*!=\\s*(\\S+)", "\"$1\" != \"$2\"");
+            condition = condition.replaceAll("\\$?(\\w+)\\s*<\\s*(\\w+)", "\"\\$$1\" -lt \"$2\"");
+            condition = condition.replaceAll("\\$?(\\w+)\\s*>\\s*(\\w+)", "\"\\$$1\" -gt \"$2\"");
+            condition = condition.replaceAll("\\$?(\\w+)\\s*==\\s*(\\w+)", "\"\\$$1\" = \"$2\"");
+            condition = condition.replaceAll("\\$?(\\w+)\\s*!=\\s*(\\w+)", "\"\\$$1\" != \"$2\"");
             return "while [ " + condition + " ]; do";
         }
 
-        // 10. foreach VAR (LIST) -> for VAR in LIST; do
+        // foreach VAR (LIST) -> for VAR in LIST; do
         Pattern foreachPattern = Pattern.compile("^foreach\\s+(\\S+)\\s+\\((.+)\\)");
         Matcher foreachMatcher = foreachPattern.matcher(trimmed);
         if (foreachMatcher.find()) {
-            return "for " + foreachMatcher.group(1) + " in " + foreachMatcher.group(2) + "; do";
+            return "for " + foreachMatcher.group(1) + " in " + foreachMatcher.group(2).trim() + "; do";
         }
 
-        // 11. switch ($var) -> case "$var" in
-        Pattern switchPattern = Pattern.compile("^switch\\s*\\(\\s*\\$?(\\S+)\\s*\\)");
+        // switch ($var) -> case "$var" in
+        Pattern switchPattern = Pattern.compile("^switch\\s*\\(\\s*\\$?(\\w+)\\s*\\)");
         Matcher switchMatcher = switchPattern.matcher(trimmed);
         if (switchMatcher.find()) {
-            return "case \"" + switchMatcher.group(1) + "\" in";
+            return "case \"$" + switchMatcher.group(1) + "\" in";
         }
 
-        // 11.1 case VALUE: -> VALUE)
+        // case VALUE: -> VALUE)
         if (trimmed.matches("^case\\s+.+:")) {
-            String label = trimmed.replaceFirst("^case\\s+", "").replace(":", "");
+            String label = trimmed.replaceFirst("^case\\s+", "").replaceFirst(":$", "").trim();
+            if ((label.startsWith("\"") && label.endsWith("\"")) ||
+                (label.startsWith("'") && label.endsWith("'"))) {
+                label = label.substring(1, label.length() - 1);
+            }
+            label = label.trim();
             return label + ")";
         }
+
         // breaksw -> ;;
         if (trimmed.trim().equals("breaksw")) {
             return ";;";
         }
         // default: -> *)
-        if (trimmed.trim().startsWith("default:")) {
+        if (trimmed.trim().equals("default:")) {
             return "*)";
         }
         // endsw -> esac
@@ -338,12 +316,12 @@ public class Csh2ShConverter implements Converter {
             return "esac";
         }
 
-        // 12. end -> done
+        // end -> done
         if (trimmed.equals("end")) {
             return "done";
         }
 
-        // 13. alias (alias X Y -> alias X='Y', unalias X -> unalias X)
+        // alias and unalias
         Pattern aliasPattern = Pattern.compile("^alias\\s+(\\S+)\\s+(.*)");
         Matcher aliasMatcher = aliasPattern.matcher(trimmed);
         if (aliasMatcher.find()) {
@@ -358,7 +336,7 @@ public class Csh2ShConverter implements Converter {
             return trimmed;
         }
 
-        // 14. goto label -> label; return (or eval "$var"; return)
+        // goto label or goto $var
         if (trimmed.startsWith("goto ")) {
             String label = trimmed.substring(5).trim();
             if (label.startsWith("$")) {
@@ -368,44 +346,43 @@ public class Csh2ShConverter implements Converter {
             }
         }
 
-        // 15. label: -> label() { ... } (closes any open function first)
+        // label: -> label() {
         if (trimmed.matches("^[A-Za-z_][A-Za-z0-9_]*:$")) {
             String label = trimmed.substring(0, trimmed.length() - 1);
             StringBuilder sb = new StringBuilder();
             if (functionBlockOpen) {
-                sb.append("}\n\n"); // close previous function
+                sb.append("}\n\n");
             }
             sb.append(label).append("() {");
             functionBlockOpen = true;
             return sb.toString();
         }
 
-        // 16. source -> . file
+        // source file -> . file
         if (trimmed.startsWith("source ")) {
-            return ". " + trimmed.substring(7);
+            return ". " + trimmed.substring(7).trim();
         }
 
-        // No transformation rule matched, so return the line as-is
+        // Fallback: return the line as-is
         return trimmed;
     }
 
     /**
-     * Replaces backtick command substitutions (e.g. <code>`command`</code>)
-     * with the modern Bash syntax <code>$(command)</code>.
+     * Converts backtick command substitutions (e.g., <code>`command`</code>)
+     * to the modern Bash syntax <code>$(command)</code>.
      *
-     * @param input the line or segment containing possible backtick usage
-     * @return the same string with backticks replaced by $(...)
+     * @param input the input string possibly containing backticks
+     * @return the string with backticks replaced by <code>$(...)</code>
      */
     private String migrateBackticks(String input) {
         return input.replaceAll("`([^`]+)`", "\\$\\($1\\)");
     }
 
     /**
-     * Extracts leading whitespace (indentation) from a line, preserving it so
-     * that it can be reapplied to the converted line(s).
+     * Extracts the leading whitespace (indentation) from a line.
      *
      * @param line the original line
-     * @return a string containing only the leading spaces or tabs
+     * @return a string containing only the leading whitespace
      */
     private String getIndent(String line) {
         Pattern pattern = Pattern.compile("^(\\s*)");
