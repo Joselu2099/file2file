@@ -63,7 +63,9 @@ public class ConverterFactory {
      * @param converterSupplier A supplier function that provides an instance of the converter
      */
     public static void registerConverter(String inputExt, String outputExt, Supplier<Converter> converterSupplier) {
-        converters.computeIfAbsent(inputExt, k -> new HashMap<>()).put(outputExt, converterSupplier);
+        String inKey = inputExt.toLowerCase();
+        String outKey = outputExt.toLowerCase();
+        converters.computeIfAbsent(inKey, k -> new HashMap<>()).put(outKey, converterSupplier);
     }
 
     /**
@@ -76,6 +78,10 @@ public class ConverterFactory {
      */
     public static Converter getConverter(String inputFile, String targetType) throws IllegalArgumentException {
         String extension = getFileExtension(inputFile);
+        if (extension != null) {
+            extension = extension.toLowerCase();
+        }
+        targetType = targetType.toLowerCase();
 
         if (extension == null || !converters.containsKey(extension)) {
             throw new IllegalArgumentException("No available converters for " + inputFile);
