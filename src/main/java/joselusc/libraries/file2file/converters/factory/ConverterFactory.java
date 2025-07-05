@@ -2,6 +2,7 @@ package joselusc.libraries.file2file.converters.factory;
 
 import joselusc.libraries.file2file.converters.interfaces.Converter;
 import joselusc.libraries.file2file.converters.Csh2ShConverter;
+import joselusc.libraries.file2file.converters.EncodingConverter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -43,6 +44,15 @@ public class ConverterFactory {
     static {
         // Register the CSH to SH converter using a Supplier
         registerConverter("csh", "sh", Csh2ShConverter::getInstance);
+
+        // Register the EncodingConverter for various file types
+        registerConverter("sql", "encoding", EncodingConverter::new);
+        registerConverter("java", "encoding", EncodingConverter::new);
+        registerConverter("js", "encoding", EncodingConverter::new);
+        registerConverter("jsp", "encoding", EncodingConverter::new);
+        registerConverter("xhtml", "encoding", EncodingConverter::new);
+        registerConverter("html", "encoding", EncodingConverter::new);
+        registerConverter("txt", "encoding", EncodingConverter::new);
     }
 
     /**

@@ -1,17 +1,22 @@
 package joselusc.libraries.file2file.gui;
 
-import joselusc.libraries.file2file.converters.interfaces.Converter;
+import com.formdev.flatlaf.FlatLightLaf;
 import joselusc.libraries.file2file.converters.factory.ConverterFactory;
+import joselusc.libraries.file2file.converters.interfaces.Converter;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.filechooser.FileFilter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
 
-/**
- * GUI mejorada para ejecutar los convertidores de file2file.
- */
 public class File2FileGUI extends JFrame {
 
     private JTextField fileField;
@@ -19,92 +24,156 @@ public class File2FileGUI extends JFrame {
     private JButton browseButton, convertButton;
 
     public File2FileGUI() {
-        setTitle("File2File Converter");
+        super("File2File Converter");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(600, 180);
+        setSize(520, 240);
         setLocationRelativeTo(null);
+        setResizable(false);
 
-        // Panel principal
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 8, 8, 8);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        try {
+            UIManager.setLookAndFeel(new FlatLightLaf());
+        } catch (Exception ignored) {}
 
-        // Selector de conversor
-        gbc.gridx = 0; gbc.gridy = 0;
-        panel.add(new JLabel("Conversor:"), gbc);
+        initUI();
+    }
 
-        converterCombo = new JComboBox<>(new String[]{"CSH a SH", "Encoding"});
-        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 2;
-        panel.add(converterCombo, gbc);
+    private void initUI() {
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBorder(new EmptyBorder(20, 30, 20, 30));
+        content.setBackground(Color.WHITE);
 
-        // Selector de archivo
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
-        panel.add(new JLabel("Archivo:"), gbc);
+        JLabel title = new JLabel("File2File Converter");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        content.add(title);
 
-        fileField = new JTextField(30);
+        content.add(Box.createVerticalStrut(20));
+
+        converterCombo = new JComboBox<>(new String[]{"CSH to SH", "Encoding"});
+        converterCombo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        converterCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        content.add(new LabeledPanel("Converter", converterCombo));
+
+        fileField = new JTextField();
         fileField.setEditable(false);
-        gbc.gridx = 1; gbc.gridy = 1;
-        panel.add(fileField, gbc);
-
-        browseButton = new JButton("Browse");
+        fileField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        browseButton = new JButton("...");
         browseButton.addActionListener(this::onBrowse);
-        gbc.gridx = 2; gbc.gridy = 1;
-        panel.add(browseButton, gbc);
 
-        // Botón de convertir
-        convertButton = new JButton("Convertir");
+        JPanel filePanel = new JPanel(new BorderLayout(5, 0));
+        filePanel.add(fileField, BorderLayout.CENTER);
+        filePanel.add(browseButton, BorderLayout.EAST);
+        filePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        content.add(new LabeledPanel("File", filePanel));
+
+        content.add(Box.createVerticalStrut(20));
+
+        convertButton = new JButton("Convert");
+        convertButton.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        convertButton.setBackground(new Color(0, 120, 215));
+        convertButton.setForeground(Color.WHITE);
+        convertButton.setFocusPainted(false);
+        convertButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         convertButton.addActionListener(this::onConvert);
-        gbc.gridx = 1; gbc.gridy = 2; gbc.gridwidth = 2;
-        panel.add(convertButton, gbc);
+        content.add(convertButton);
 
-        setContentPane(panel);
+        setContentPane(content);
     }
 
     private void onBrowse(ActionEvent e) {
-        JFileChooser chooser = new JFileChooser();
-        int result = chooser.showOpenDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            fileField.setText(chooser.getSelectedFile().getAbsolutePath());
-        }
-    }
+        JFileChooser chooser = new JFileChooser() {
+            @Override
+            public void approveSelection() {
+                File selected = getSelectedFile();
+                if (selected != null && selected.isFile()) {
+                    fileField.setText(selected.getAbsolutePath());
+                }
+                super.approveSelection();
+            }
+        };
 
+        chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        chooser.setAcceptAllFileFilterUsed(false);
+        File initialDir = chooser.getCurrentDirectory();
+
+        JPanel accessory = new JPanel(new BorderLayout(5, 5));
+        accessory.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        accessory.setBackground(Color.WHITE);
+
+        JLabel filterLabel = new JLabel("Filter:");
+        JTextField filterField = new JTextField();
+
+        filterLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        filterField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        filterField.setBackground(new Color(245, 245, 245));
+        filterField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+
+        accessory.add(filterLabel, BorderLayout.NORTH);
+        accessory.add(filterField, BorderLayout.CENTER);
+        chooser.setAccessory(accessory);
+
+        // Filtro personalizado con estado
+        class DynamicFilter extends FileFilter {
+            private String filterText = "";
+
+            public void setFilterText(String text) {
+                this.filterText = text.toLowerCase();
+            }
+
+            @Override
+            public boolean accept(File f) {
+                return f.isDirectory() || f.getName().toLowerCase().contains(filterText);
+            }
+
+            @Override
+            public String getDescription() {
+                return "Filtered files";
+            }
+        }
+
+        DynamicFilter dynamicFilter = new DynamicFilter();
+        chooser.setFileFilter(dynamicFilter);
+
+        filterField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { update(); }
+            public void removeUpdate(DocumentEvent e) { update(); }
+            public void changedUpdate(DocumentEvent e) { update(); }
+
+            private void update() {
+                dynamicFilter.setFilterText(filterField.getText());
+                chooser.rescanCurrentDirectory();
+            }
+        });
+
+        chooser.showOpenDialog(this);
+    }
+    
     private void onConvert(ActionEvent e) {
         String filePath = fileField.getText();
         if (filePath.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Por favor, selecciona un archivo.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please select a file.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         String selectedConverter = (String) converterCombo.getSelectedItem();
-        String targetType;
-        switch (selectedConverter) {
-            case "CSH a SH":
-                targetType = "sh";
-                break;
-            case "Encoding":
-                targetType = "encoding";
-                break;
-            default:
-                JOptionPane.showMessageDialog(this, "Conversor no soportado.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-        }
+        String targetType = selectedConverter.equals("CSH to SH") ? "sh" : "encoding";
 
         try {
             Converter converter = ConverterFactory.getConverter(filePath, targetType);
             if (converter == null) {
-                JOptionPane.showMessageDialog(this, "No se encontró un convertidor para ese tipo.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "No converter found for this type.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             File output = converter.convert(filePath);
-
-            // Renombrar el archivo de salida con _CONVERTED y extensión correspondiente
-            String outputPath = getConvertedFileName(filePath, targetType);
-            File renamed = new File(outputPath);
+            File renamed = new File(getConvertedFileName(filePath, targetType));
             if (output.renameTo(renamed)) {
-                JOptionPane.showMessageDialog(this, "Conversión exitosa:\n" + renamed.getAbsolutePath(), "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Conversion successful:\n" + renamed.getAbsolutePath(), "Success", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(this, "Conversión realizada, pero no se pudo renombrar el archivo.", "Aviso", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Conversion done, but could not rename the file.", "Warning", JOptionPane.WARNING_MESSAGE);
             }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -116,11 +185,22 @@ public class File2FileGUI extends JFrame {
         String name = original.getName();
         int dot = name.lastIndexOf('.');
         String base = (dot > 0) ? name.substring(0, dot) : name;
-        String ext = (targetType.equals("sh")) ? ".sh" : ".txt";
+        String ext = targetType.equals("sh") ? ".sh" : ".txt";
         return new File(original.getParent(), base + "_CONVERTED" + ext).getAbsolutePath();
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new File2FileGUI().setVisible(true));
+    }
+
+    static class LabeledPanel extends JPanel {
+        public LabeledPanel(String labelText, JComponent field) {
+            setLayout(new BorderLayout(5, 5));
+            setBackground(Color.WHITE);
+            JLabel label = new JLabel(labelText);
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            add(label, BorderLayout.NORTH);
+            add(field, BorderLayout.CENTER);
+        }
     }
 }
