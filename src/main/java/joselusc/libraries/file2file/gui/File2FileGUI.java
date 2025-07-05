@@ -8,14 +8,10 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileSystemView;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.List;
-import java.util.stream.Collectors;
 
 public class File2FileGUI extends JFrame {
 
@@ -82,7 +78,153 @@ public class File2FileGUI extends JFrame {
     }
 
     private void onBrowse(ActionEvent e) {
-        JFileChooser chooser = new JFileChooser() {
+        class FilteringFileSystemView extends FileSystemView {
+            private final FileSystemView delegate = FileSystemView.getFileSystemView();
+            private String filterText = "";
+
+            public void setFilterText(String text) {
+                filterText = text == null ? "" : text.toLowerCase();
+            }
+
+            @Override
+            public File createNewFolder(File containingDir) throws java.io.IOException {
+                return delegate.createNewFolder(containingDir);
+            }
+
+            @Override
+            public File[] getRoots() {
+                return delegate.getRoots();
+            }
+
+            @Override
+            public File getHomeDirectory() {
+                return delegate.getHomeDirectory();
+            }
+
+            @Override
+            public File getDefaultDirectory() {
+                return delegate.getDefaultDirectory();
+            }
+
+            @Override
+            public File createFileObject(File dir, String filename) {
+                return delegate.createFileObject(dir, filename);
+            }
+
+            @Override
+            public File createFileObject(String path) {
+                return delegate.createFileObject(path);
+            }
+
+            @Override
+            public File[] getFiles(File dir, boolean useFileHiding) {
+                File[] files = delegate.getFiles(dir, useFileHiding);
+                if (filterText.isEmpty()) {
+                    return files;
+                }
+                java.util.List<File> filtered = new java.util.ArrayList<>();
+                for (File f : files) {
+                    if (f.getName().toLowerCase().contains(filterText)) {
+                        filtered.add(f);
+                    }
+                }
+                return filtered.toArray(new File[0]);
+            }
+
+            @Override
+            public File getParentDirectory(File dir) {
+                return delegate.getParentDirectory(dir);
+            }
+
+            @Override
+            public File[] getChooserComboBoxFiles() {
+                return delegate.getChooserComboBoxFiles();
+            }
+
+            @Override
+            public boolean isFileSystemRoot(File f) {
+                return delegate.isFileSystemRoot(f);
+            }
+
+            @Override
+            public boolean isDrive(File dir) {
+                return delegate.isDrive(dir);
+            }
+
+            @Override
+            public boolean isFloppyDrive(File dir) {
+                return delegate.isFloppyDrive(dir);
+            }
+
+            @Override
+            public boolean isComputerNode(File dir) {
+                return delegate.isComputerNode(dir);
+            }
+
+            @Override
+            public boolean isFileSystem(File f) {
+                return delegate.isFileSystem(f);
+            }
+
+            @Override
+            public boolean isHiddenFile(File f) {
+                return delegate.isHiddenFile(f);
+            }
+
+            @Override
+            public boolean isRoot(File f) {
+                return delegate.isRoot(f);
+            }
+
+            @Override
+            public Boolean isTraversable(File f) {
+                return delegate.isTraversable(f);
+            }
+
+            @Override
+            public String getSystemDisplayName(File f) {
+                return delegate.getSystemDisplayName(f);
+            }
+
+            @Override
+            public String getSystemTypeDescription(File f) {
+                return delegate.getSystemTypeDescription(f);
+            }
+
+            @Override
+            public Icon getSystemIcon(File f) {
+                return delegate.getSystemIcon(f);
+            }
+
+            @Override
+            public Icon getSystemIcon(File f, int width, int height) {
+                return delegate.getSystemIcon(f, width, height);
+            }
+
+            @Override
+            public boolean isParent(File folder, File file) {
+                return delegate.isParent(folder, file);
+            }
+
+            @Override
+            public File getChild(File parent, String fileName) {
+                return delegate.getChild(parent, fileName);
+            }
+
+            @Override
+            public boolean isLink(File f) {
+                return delegate.isLink(f);
+            }
+
+            @Override
+            public File getLinkLocation(File f) throws java.io.FileNotFoundException {
+                return delegate.getLinkLocation(f);
+            }
+        }
+
+        FilteringFileSystemView fsv = new FilteringFileSystemView();
+
+        JFileChooser chooser = new JFileChooser(fsv) {
             @Override
             public void approveSelection() {
                 File selected = getSelectedFile();
@@ -94,8 +236,7 @@ public class File2FileGUI extends JFrame {
         };
 
         chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        chooser.setAcceptAllFileFilterUsed(false);
-        File initialDir = chooser.getCurrentDirectory();
+        chooser.setAcceptAllFileFilterUsed(true);
 
         JPanel accessory = new JPanel(new BorderLayout(5, 5));
         accessory.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -116,35 +257,13 @@ public class File2FileGUI extends JFrame {
         accessory.add(filterField, BorderLayout.CENTER);
         chooser.setAccessory(accessory);
 
-        // Filtro personalizado con estado
-        class DynamicFilter extends FileFilter {
-            private String filterText = "";
-
-            public void setFilterText(String text) {
-                this.filterText = text.toLowerCase();
-            }
-
-            @Override
-            public boolean accept(File f) {
-                return f.isDirectory() || f.getName().toLowerCase().contains(filterText);
-            }
-
-            @Override
-            public String getDescription() {
-                return "Filtered files";
-            }
-        }
-
-        DynamicFilter dynamicFilter = new DynamicFilter();
-        chooser.setFileFilter(dynamicFilter);
-
         filterField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { update(); }
             public void removeUpdate(DocumentEvent e) { update(); }
             public void changedUpdate(DocumentEvent e) { update(); }
 
             private void update() {
-                dynamicFilter.setFilterText(filterField.getText());
+                fsv.setFilterText(filterField.getText());
                 chooser.rescanCurrentDirectory();
             }
         });
