@@ -51,14 +51,18 @@ public class EncodingConverter implements Converter {
      */
     @Override
     public File convert(String inputPath) throws IOException {
-        return convertDirectory(
-            new File(inputPath),
-            Charset.forName("windows-1252"),
-            Charset.forName("UTF-8"),
-            DEFAULT_EXTENSIONS,
-            true,
-            false
-        );
+        File path = new File(inputPath);
+        Charset source = Charset.forName("windows-1252");
+        Charset target = Charset.forName("UTF-8");
+
+        if (path.isDirectory()) {
+            return convertDirectory(path, source, target, DEFAULT_EXTENSIONS, true, false);
+        } else if (path.isFile()) {
+            convertFileEncoding(path, source, target, true, false);
+            return path;
+        }
+
+        throw new FileNotFoundException("Input path does not exist: " + inputPath);
     }
 
     /**

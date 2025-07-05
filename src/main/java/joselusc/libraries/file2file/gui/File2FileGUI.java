@@ -162,9 +162,25 @@ public class File2FileGUI extends JFrame {
                 return delegate.getParentDirectory(dir);
             }
 
-            @Override
+            // The following methods were introduced in newer Java versions and
+            // are not available when compiling with an older JDK (e.g. Java 8).
+            // We still want to delegate to them when running on a newer JDK, so
+            // we use reflection.  When running on an older JDK the methods do
+            // not exist, therefore we simply fall back to the default behaviour
+            // of {@link FileSystemView} by returning {@code null} or delegating
+            // to other existing APIs.
+
+            /**
+             * Attempts to delegate to {@code FileSystemView.getChooserComboBoxFiles()} via
+             * reflection. Returns {@code null} when the method is not available.
+             */
             public File[] getChooserComboBoxFiles() {
-                return delegate.getChooserComboBoxFiles();
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod("getChooserComboBoxFiles");
+                    return (File[]) m.invoke(delegate);
+                } catch (Exception e) {
+                    return null;
+                }
             }
 
             @Override
@@ -222,9 +238,20 @@ public class File2FileGUI extends JFrame {
                 return delegate.getSystemIcon(f);
             }
 
-            @Override
+            /**
+             * Attempts to obtain a scaled system icon through reflection if the
+             * method {@code getSystemIcon(File,int,int)} is available. When
+             * running on an older JDK where the method does not exist the
+             * unscaled icon is returned instead.
+             */
             public Icon getSystemIcon(File f, int width, int height) {
-                return delegate.getSystemIcon(f, width, height);
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod(
+                            "getSystemIcon", File.class, int.class, int.class);
+                    return (Icon) m.invoke(delegate, f, width, height);
+                } catch (Exception e) {
+                    return delegate.getSystemIcon(f);
+                }
             }
 
             @Override
@@ -237,14 +264,32 @@ public class File2FileGUI extends JFrame {
                 return delegate.getChild(parent, fileName);
             }
 
-            @Override
+            /**
+             * Returns {@code true} if the specified file represents a symbolic
+             * link.  On older JDKs this information is not available via
+             * {@link FileSystemView}, so {@code false} is returned.
+             */
             public boolean isLink(File f) {
-                return delegate.isLink(f);
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod("isLink", File.class);
+                    return (Boolean) m.invoke(delegate, f);
+                } catch (Exception e) {
+                    return false;
+                }
             }
 
-            @Override
+            /**
+             * Attempts to resolve the target of a symbolic link. When running
+             * on a JDK that does not provide {@code getLinkLocation(File)} the
+             * original file is returned.
+             */
             public File getLinkLocation(File f) throws java.io.FileNotFoundException {
-                return delegate.getLinkLocation(f);
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod("getLinkLocation", File.class);
+                    return (File) m.invoke(delegate, f);
+                } catch (Exception e) {
+                    return f;
+                }
             }
         }
 
@@ -255,7 +300,7 @@ public class File2FileGUI extends JFrame {
             public void approveSelection() {
                 File selected = getSelectedFile();
                 if (selected != null && selected.isFile()) {
-                    setSelectedFile(selected);
+                    File2FileGUI.this.setSelectedFile(selected);
                 }
                 super.approveSelection();
             }
@@ -290,6 +335,7 @@ public class File2FileGUI extends JFrame {
         accessory.add(filterLabel, BorderLayout.NORTH);
         accessory.add(filterField, BorderLayout.CENTER);
         chooser.setAccessory(accessory);
+        SwingUtilities.invokeLater(() -> filterField.requestFocusInWindow());
 
         filterField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { update(); }
@@ -302,7 +348,13 @@ public class File2FileGUI extends JFrame {
             }
         });
 
-        chooser.showOpenDialog(this);
+        int result = chooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File chosen = chooser.getSelectedFile();
+            if (chosen != null && chosen.isFile()) {
+                setSelectedFile(chosen);
+            }
+        }
     }
 
     private void setupDragAndDrop() {
