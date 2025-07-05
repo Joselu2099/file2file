@@ -27,7 +27,7 @@ You can use file2file as:
 
 ## Installation
 
-You need **Java 17 or later** installed.
+You need **Java 8 or later** installed.
 
 1. Download the latest `file2file.jar` from the [releases page](#) (replace with actual link).
 2. To verify the installation, run:

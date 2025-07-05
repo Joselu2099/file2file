@@ -3,6 +3,9 @@ package joselusc.libraries.file2file.gui;
 import com.formdev.flatlaf.FlatLightLaf;
 import joselusc.libraries.file2file.converters.factory.ConverterFactory;
 import joselusc.libraries.file2file.converters.interfaces.Converter;
+import joselusc.libraries.file2file.gui.components.LabeledPanel;
+
+import java.util.prefs.Preferences;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -17,10 +20,21 @@ import java.io.File;
 
 public class File2FileGUI extends JFrame {
 
+    private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 22);
+    private static final Font FONT_NORMAL = new Font("Segoe UI", Font.PLAIN, 14);
+    private static final Font FONT_LABEL = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final Font FONT_BOLD15 = new Font("Segoe UI", Font.BOLD, 15);
+    private static final Color COLOR_PRIMARY = new Color(0, 120, 215);
+    private static final Color DROP_HIGHLIGHT = new Color(220, 235, 250);
+
+    private static final Preferences PREFS = Preferences.userNodeForPackage(File2FileGUI.class);
+    private static final String KEY_LAST_FILE = "lastFile";
+
     private JTextField fileField;
     private Color fileFieldBg;
     private JComboBox<String> converterCombo;
     private JButton browseButton, convertButton;
+    private JProgressBar progressBar;
 
     public File2FileGUI() {
         super("File2File Converter");
@@ -43,80 +57,23 @@ public class File2FileGUI extends JFrame {
         content.setBackground(Color.WHITE);
 
         JLabel title = new JLabel("File2File Converter");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        title.setFont(FONT_TITLE);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
         content.add(title);
 
         content.add(Box.createVerticalStrut(20));
 
         converterCombo = new JComboBox<>(new String[]{"CSH to SH", "Encoding"});
-        converterCombo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        converterCombo.setFont(FONT_NORMAL);
         converterCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         content.add(new LabeledPanel("Converter", converterCombo));
 
-        fileField = new JTextField();
+        fileField = new JTextField(PREFS.get(KEY_LAST_FILE, ""));
         fileField.setEditable(false);
-        fileField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        fileField.setFont(FONT_NORMAL);
         fileFieldBg = fileField.getBackground();
 
-        new DropTarget(fileField, new DropTargetAdapter() {
-            @Override
-            public void dragEnter(DropTargetDragEvent dtde) {
-                if (isSingleFileDrag(dtde)) {
-                    dtde.acceptDrag(DnDConstants.ACTION_COPY);
-                    fileField.setBackground(new Color(220, 235, 250));
-                } else {
-                    dtde.rejectDrag();
-                }
-            }
-
-            @Override
-            public void dragExit(DropTargetEvent dte) {
-                fileField.setBackground(fileFieldBg);
-            }
-
-            @Override
-            public void drop(DropTargetDropEvent dtde) {
-                fileField.setBackground(fileFieldBg);
-                if (isSingleFileDrag(dtde)) {
-                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
-                    try {
-                        @SuppressWarnings("unchecked")
-                        List<File> files = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                        File f = files.get(0);
-                        if (f.isFile()) {
-                            fileField.setText(f.getAbsolutePath());
-                            dtde.dropComplete(true);
-                            return;
-                        }
-                    } catch (Exception ignored) {}
-                }
-                dtde.rejectDrop();
-                dtde.dropComplete(false);
-            }
-
-            private boolean isSingleFileDrag(DropTargetDragEvent dtde) {
-                if (!dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) return false;
-                try {
-                    @SuppressWarnings("unchecked")
-                    List<File> files = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                    return files.size() == 1 && files.get(0).isFile();
-                } catch (Exception e) {
-                    return false;
-                }
-            }
-
-            private boolean isSingleFileDrag(DropTargetDropEvent dtde) {
-                if (!dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) return false;
-                try {
-                    @SuppressWarnings("unchecked")
-                    List<File> files = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                    return files.size() == 1 && files.get(0).isFile();
-                } catch (Exception e) {
-                    return false;
-                }
-            }
-        });
+        setupDragAndDrop();
         browseButton = new JButton("...");
         browseButton.addActionListener(this::onBrowse);
 
@@ -129,13 +86,19 @@ public class File2FileGUI extends JFrame {
         content.add(Box.createVerticalStrut(20));
 
         convertButton = new JButton("Convert");
-        convertButton.setFont(new Font("Segoe UI", Font.BOLD, 15));
-        convertButton.setBackground(new Color(0, 120, 215));
+        convertButton.setFont(FONT_BOLD15);
+        convertButton.setBackground(COLOR_PRIMARY);
         convertButton.setForeground(Color.WHITE);
         convertButton.setFocusPainted(false);
         convertButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         convertButton.addActionListener(this::onConvert);
         content.add(convertButton);
+
+        progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setVisible(false);
+        content.add(Box.createVerticalStrut(10));
+        content.add(progressBar);
 
         setContentPane(content);
     }
@@ -292,11 +255,19 @@ public class File2FileGUI extends JFrame {
             public void approveSelection() {
                 File selected = getSelectedFile();
                 if (selected != null && selected.isFile()) {
-                    fileField.setText(selected.getAbsolutePath());
+                    setSelectedFile(selected);
                 }
                 super.approveSelection();
             }
         };
+
+        String last = PREFS.get(KEY_LAST_FILE, null);
+        if (last != null) {
+            File f = new File(last);
+            if (f.getParentFile() != null && f.getParentFile().exists()) {
+                chooser.setCurrentDirectory(f.getParentFile());
+            }
+        }
 
         chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
         chooser.setAcceptAllFileFilterUsed(true);
@@ -308,8 +279,8 @@ public class File2FileGUI extends JFrame {
         JLabel filterLabel = new JLabel("Filter:");
         JTextField filterField = new JTextField();
 
-        filterLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        filterField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        filterLabel.setFont(FONT_LABEL);
+        filterField.setFont(FONT_NORMAL);
         filterField.setBackground(new Color(245, 245, 245));
         filterField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200)),
@@ -333,6 +304,68 @@ public class File2FileGUI extends JFrame {
 
         chooser.showOpenDialog(this);
     }
+
+    private void setupDragAndDrop() {
+        new DropTarget(fileField, new DropTargetAdapter() {
+            @Override
+            public void dragEnter(DropTargetDragEvent dtde) {
+                if (isSingleFile(dtde)) {
+                    dtde.acceptDrag(DnDConstants.ACTION_COPY);
+                    fileField.setBackground(DROP_HIGHLIGHT);
+                } else {
+                    dtde.rejectDrag();
+                }
+            }
+
+            @Override
+            public void dragExit(DropTargetEvent dte) {
+                fileField.setBackground(fileFieldBg);
+            }
+
+            @Override
+            public void drop(DropTargetDropEvent dtde) {
+                fileField.setBackground(fileFieldBg);
+                if (isSingleFile(dtde)) {
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                    try {
+                        @SuppressWarnings("unchecked")
+                        java.util.List<File> files = (java.util.List<File>) dtde.getTransferable()
+                                .getTransferData(DataFlavor.javaFileListFlavor);
+                        File f = files.get(0);
+                        if (f.isFile()) {
+                            setSelectedFile(f);
+                            dtde.dropComplete(true);
+                            return;
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                dtde.rejectDrop();
+                dtde.dropComplete(false);
+            }
+        });
+    }
+
+    private static boolean isSingleFile(DropTargetDragEvent e) {
+        return isSingleFile(e.getTransferable());
+    }
+
+    private static boolean isSingleFile(DropTargetDropEvent e) {
+        return isSingleFile(e.getTransferable());
+    }
+
+    private static boolean isSingleFile(java.awt.datatransfer.Transferable t) {
+        if (!t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+            return false;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.List<File> files = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
+            return files.size() == 1 && files.get(0).isFile();
+        } catch (Exception e) {
+            return false;
+        }
+    }
     
     private void onConvert(ActionEvent e) {
         String filePath = fileField.getText();
@@ -344,22 +377,38 @@ public class File2FileGUI extends JFrame {
         String selectedConverter = (String) converterCombo.getSelectedItem();
         String targetType = selectedConverter.equals("CSH to SH") ? "sh" : "encoding";
 
-        try {
-            Converter converter = ConverterFactory.getConverter(filePath, targetType);
-            if (converter == null) {
-                JOptionPane.showMessageDialog(this, "No converter found for this type.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
+        progressBar.setVisible(true);
+        convertButton.setEnabled(false);
+
+        new SwingWorker<File, Void>() {
+            @Override
+            protected File doInBackground() throws Exception {
+                Converter converter = ConverterFactory.getConverter(filePath, targetType);
+                return converter.convert(filePath);
             }
-            File output = converter.convert(filePath);
-            File renamed = new File(getConvertedFileName(filePath, targetType));
-            if (output.renameTo(renamed)) {
-                JOptionPane.showMessageDialog(this, "Conversion successful:\n" + renamed.getAbsolutePath(), "Success", JOptionPane.INFORMATION_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(this, "Conversion done, but could not rename the file.", "Warning", JOptionPane.WARNING_MESSAGE);
+
+            @Override
+            protected void done() {
+                progressBar.setVisible(false);
+                convertButton.setEnabled(true);
+                try {
+                    File output = get();
+                    File renamed = new File(getConvertedFileName(filePath, targetType));
+                    if (output.renameTo(renamed)) {
+                        JOptionPane.showMessageDialog(File2FileGUI.this,
+                                "Conversion successful:\n" + renamed.getAbsolutePath(),
+                                "Success", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(File2FileGUI.this,
+                                "Conversion done, but could not rename the file.",
+                                "Warning", JOptionPane.WARNING_MESSAGE);
+                    }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(File2FileGUI.this,
+                            "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
             }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        }.execute();
     }
 
     private String getConvertedFileName(String originalPath, String targetType) {
@@ -371,18 +420,13 @@ public class File2FileGUI extends JFrame {
         return new File(original.getParent(), base + "_CONVERTED" + ext).getAbsolutePath();
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new File2FileGUI().setVisible(true));
+    private void setSelectedFile(File file) {
+        String path = file.getAbsolutePath();
+        fileField.setText(path);
+        PREFS.put(KEY_LAST_FILE, path);
     }
 
-    static class LabeledPanel extends JPanel {
-        public LabeledPanel(String labelText, JComponent field) {
-            setLayout(new BorderLayout(5, 5));
-            setBackground(Color.WHITE);
-            JLabel label = new JLabel(labelText);
-            label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-            add(label, BorderLayout.NORTH);
-            add(field, BorderLayout.CENTER);
-        }
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new File2FileGUI().setVisible(true));
     }
 }
