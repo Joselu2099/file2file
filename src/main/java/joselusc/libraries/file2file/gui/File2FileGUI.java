@@ -11,6 +11,8 @@ import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileFilter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.dnd.*;
+import java.awt.datatransfer.DataFlavor;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class File2FileGUI extends JFrame {
 
     private JTextField fileField;
+    private Color fileFieldBg;
     private JComboBox<String> converterCombo;
     private JButton browseButton, convertButton;
 
@@ -58,6 +61,66 @@ public class File2FileGUI extends JFrame {
         fileField = new JTextField();
         fileField.setEditable(false);
         fileField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        fileFieldBg = fileField.getBackground();
+
+        new DropTarget(fileField, new DropTargetAdapter() {
+            @Override
+            public void dragEnter(DropTargetDragEvent dtde) {
+                if (isSingleFileDrag(dtde)) {
+                    dtde.acceptDrag(DnDConstants.ACTION_COPY);
+                    fileField.setBackground(new Color(220, 235, 250));
+                } else {
+                    dtde.rejectDrag();
+                }
+            }
+
+            @Override
+            public void dragExit(DropTargetEvent dte) {
+                fileField.setBackground(fileFieldBg);
+            }
+
+            @Override
+            public void drop(DropTargetDropEvent dtde) {
+                fileField.setBackground(fileFieldBg);
+                if (isSingleFileDrag(dtde)) {
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                    try {
+                        @SuppressWarnings("unchecked")
+                        List<File> files = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                        File f = files.get(0);
+                        if (f.isFile()) {
+                            fileField.setText(f.getAbsolutePath());
+                            dtde.dropComplete(true);
+                            return;
+                        }
+                    } catch (Exception ignored) {}
+                }
+                dtde.rejectDrop();
+                dtde.dropComplete(false);
+            }
+
+            private boolean isSingleFileDrag(DropTargetDragEvent dtde) {
+                if (!dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) return false;
+                try {
+                    @SuppressWarnings("unchecked")
+                    List<File> files = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                    return files.size() == 1 && files.get(0).isFile();
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+
+            private boolean isSingleFileDrag(DropTargetDropEvent dtde) {
+                if (!dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) return false;
+                try {
+                    @SuppressWarnings("unchecked")
+                    List<File> files = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
+                    return files.size() == 1 && files.get(0).isFile();
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+        });
         browseButton = new JButton("...");
         browseButton.addActionListener(this::onBrowse);
 
