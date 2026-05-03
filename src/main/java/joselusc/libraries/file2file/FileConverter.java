@@ -63,6 +63,17 @@ public class FileConverter {
                 .desc("Exclude directories or patterns")
                 .build();
         options.addOption(excludeOption);
+        Option dryRunOption = Option.builder()
+                .longOpt("dry-run")
+                .desc("Show what would be modified and a diff without writing to disk")
+                .build();
+        options.addOption(dryRunOption);
+
+        Option backupOption = Option.builder()
+                .longOpt("backup")
+                .desc("Create a backup copy (.bak) before overwriting any file")
+                .build();
+        options.addOption(backupOption);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -99,6 +110,12 @@ public class FileConverter {
 
             if (cmd.hasOption("e")) {
                 converter.setExcludes(java.util.Arrays.asList(cmd.getOptionValues("e")));
+            }
+            if (cmd.hasOption("dry-run")) {
+                converter.setDryRun(true);
+            }
+            if (cmd.hasOption("backup")) {
+                converter.setBackup(true);
             }
 
             if (remainingArgs.length == 2) {

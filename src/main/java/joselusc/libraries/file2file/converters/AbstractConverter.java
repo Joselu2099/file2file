@@ -47,6 +47,19 @@ public abstract class AbstractConverter implements Converter {
         return false;
     }
 
+    protected boolean dryRun = false;
+    protected boolean backup = false;
+
+    @Override
+    public void setDryRun(boolean dryRun) {
+        this.dryRun = dryRun;
+    }
+
+    @Override
+    public void setBackup(boolean backup) {
+        this.backup = backup;
+    }
+
     /**
      * Provides the target extension (including the dot, e.g., ".sh", ".java").
      */
@@ -93,7 +106,9 @@ public abstract class AbstractConverter implements Converter {
 
         if (Files.isDirectory(source)) {
             if (!Files.exists(target)) {
-                Files.createDirectories(target);
+                if (!dryRun) {
+                    Files.createDirectories(target);
+                }
             } else if (!Files.isDirectory(target)) {
                 throw new IOException("Target exists but is not a directory: " + target);
             }
@@ -129,7 +144,9 @@ public abstract class AbstractConverter implements Converter {
                                 targetFile = targetFile.resolveSibling(fileName);
                             }
 
-                            Files.createDirectories(targetFile.getParent());
+                            if (!dryRun) {
+                                Files.createDirectories(targetFile.getParent());
+                            }
                             convertFile(p, targetFile);
                         }
                     } catch (IOException e) {
@@ -161,7 +178,9 @@ public abstract class AbstractConverter implements Converter {
             } else {
                 // If target is a file path but parent doesn't exist, create it
                 if (targetFile.getParent() != null && !Files.exists(targetFile.getParent())) {
-                    Files.createDirectories(targetFile.getParent());
+                    if (!dryRun) {
+                        Files.createDirectories(targetFile.getParent());
+                    }
                 }
             }
             convertFile(source, targetFile);
@@ -176,7 +195,42 @@ public abstract class AbstractConverter implements Converter {
         // Let subclass modify the content
         String converted = convertContent(content);
 
+        if (dryRun) {
+            System.out.println("--- Dry Run: " + source + " -> " + target + " ---");
+            System.out.println(generateSimpleDiff(content, converted));
+            System.out.println("--------------------------------------------------\n");
+            return;
+        }
+
+        if (backup && Files.exists(target)) {
+            Path backupFile = target.resolveSibling(target.getFileName().toString() + ".bak");
+            Files.copy(target, backupFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Created backup: " + backupFile);
+        }
+
         Files.write(target, converted.getBytes(charset));
+    }
+
+    private String generateSimpleDiff(String original, String converted) {
+        String[] origLines = original.split("\n", -1);
+        String[] convLines = converted.split("\n", -1);
+        StringBuilder diff = new StringBuilder();
+
+        int i = 0, j = 0;
+        while (i < origLines.length || j < convLines.length) {
+            if (i < origLines.length && j < convLines.length && origLines[i].equals(convLines[j])) {
+                diff.append("  ").append(origLines[i]).append("\n");
+                i++;
+                j++;
+            } else if (i < origLines.length && (j >= convLines.length || !origLines[i].equals(convLines[j]))) {
+                diff.append("- ").append(origLines[i]).append("\n");
+                i++;
+            } else if (j < convLines.length) {
+                diff.append("+ ").append(convLines[j]).append("\n");
+                j++;
+            }
+        }
+        return diff.toString();
     }
 
     protected Charset detectCharset(Path path) throws IOException {
