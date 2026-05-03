@@ -157,7 +157,7 @@ class Csh2ShConverterTest {
 
         assertTrue(shContent.contains("label1() {"));
         assertTrue(shContent.contains("label1"));
-        assertTrue(shContent.contains("eval \"$next\""));
+        assertTrue(shContent.contains("\"$next\""));
         assertTrue(shContent.contains("return"));
     }
 
@@ -216,6 +216,42 @@ class Csh2ShConverterTest {
 
         assertTrue(shContent.contains("export VAR1=value1"));
         assertTrue(shContent.contains("VAR2=value2"));
+    }
+
+    /**
+     * Tests that malicious goto labels are handled safely.
+     */
+    @Test
+    void testGotoSecurity() throws IOException {
+        String cshScript = "goto $(rm -rf /)\ngoto \"; echo injected; #";
+        Path cshFile = tempDir.resolve("security.csh");
+        Files.write(cshFile, cshScript.getBytes());
+
+        File shFile = Csh2ShConverter.getInstance().convert(cshFile.toString());
+        String shContent = new String(Files.readAllBytes(shFile.toPath()));
+
+        // Should not contain eval
+        assertFalse(shContent.contains("eval"));
+        // Should be commented out as unsupported
+        assertTrue(shContent.contains("# goto $(rm -rf /) (not supported in Bash)"));
+        assertTrue(shContent.contains("# goto \"; echo injected; # (not supported in Bash)"));
+    }
+
+    /**
+     * Tests that valid variable goto labels are converted safely.
+     */
+    @Test
+    void testGotoVariableSafe() throws IOException {
+        String cshScript = "goto $VAR\ngoto ${VAR2}";
+        Path cshFile = tempDir.resolve("safe_vars.csh");
+        Files.write(cshFile, cshScript.getBytes());
+
+        File shFile = Csh2ShConverter.getInstance().convert(cshFile.toString());
+        String shContent = new String(Files.readAllBytes(shFile.toPath()));
+
+        assertTrue(shContent.contains("\"$VAR\""));
+        assertTrue(shContent.contains("\"${VAR2}\""));
+        assertFalse(shContent.contains("eval"));
     }
 
     /**
