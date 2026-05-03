@@ -6,10 +6,46 @@ import java.nio.charset.Charset;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 public abstract class AbstractConverter implements Converter {
+
+    protected List<String> excludes = new ArrayList<>();
+
+    @Override
+    public void setExcludes(List<String> excludes) {
+        if (excludes != null) {
+            this.excludes = new ArrayList<>(excludes);
+        }
+    }
+
+    protected boolean isExcluded(Path path) {
+        if (excludes == null || excludes.isEmpty()) return false;
+        Path fileNamePath = path.getFileName();
+        if (fileNamePath == null) return false;
+        String fileName = fileNamePath.toString();
+        for (String pattern : excludes) {
+            if (fileName.equals(pattern)) {
+                return true;
+            }
+            try {
+                // If it's a glob pattern like *.txt
+                if (FileSystems.getDefault().getPathMatcher("glob:" + pattern).matches(path.getFileName())) {
+                    return true;
+                }
+            } catch (Exception e) {
+                // Ignore invalid pattern syntax
+            }
+        }
+        return false;
+    }
 
     /**
      * Provides the target extension (including the dot, e.g., ".sh", ".java").
@@ -62,8 +98,20 @@ public abstract class AbstractConverter implements Converter {
                 throw new IOException("Target exists but is not a directory: " + target);
             }
 
-            try (Stream<Path> stream = Files.walk(source)) {
-                stream.forEach(p -> {
+            Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (isExcluded(dir)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path p, BasicFileAttributes attrs) throws IOException {
+                    if (isExcluded(p)) {
+                        return FileVisitResult.CONTINUE;
+                    }
                     try {
                         if (Files.isRegularFile(p) && acceptFile(p)) {
                             Path relative = source.relativize(p);
@@ -87,8 +135,15 @@ public abstract class AbstractConverter implements Converter {
                     } catch (IOException e) {
                         System.err.println("Failed to convert file " + p + ": " + e.getMessage());
                     }
-                });
-            }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+                    System.err.println("Failed to visit file " + file + ": " + exc.getMessage());
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } else {
             Path targetFile = target;
             if (Files.isDirectory(target)) {

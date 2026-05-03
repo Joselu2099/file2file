@@ -56,6 +56,14 @@ public class FileConverter {
                 .build();
         options.addOption(helpOption);
 
+        Option excludeOption = Option.builder("e")
+                .longOpt("exclude")
+                .hasArgs()
+                .valueSeparator(',')
+                .desc("Exclude directories or patterns")
+                .build();
+        options.addOption(excludeOption);
+
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
@@ -87,6 +95,10 @@ public class FileConverter {
             Converter converter = ConverterFactory.getConverter(inputFilePath, targetType);
             if (converter == null) {
                 throw new IllegalArgumentException("No converter found for " + inputFilePath + " -> " + targetType);
+            }
+
+            if (cmd.hasOption("e")) {
+                converter.setExcludes(java.util.Arrays.asList(cmd.getOptionValues("e")));
             }
 
             if (remainingArgs.length == 2) {
