@@ -372,8 +372,8 @@ public class Csh2ShConverter extends AbstractConverter {
             // In Bash, goto is not supported. We can call the function if label exists.
             if (label.matches("^[A-Za-z_][A-Za-z0-9_]*$")) {
                 return label + "  # goto replaced by function call\nreturn";
-            } else if (label.startsWith("$")) {
-                return "eval \"" + label + "\"\nreturn";
+            } else if (label.matches("^\\$([A-Za-z_][A-Za-z0-9_]*|[0-9]+|\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\{[0-9]+\\})$")) {
+                return "\"" + label + "\"\nreturn";
             } else {
                 return "# goto " + label + " (not supported in Bash)";
             }
