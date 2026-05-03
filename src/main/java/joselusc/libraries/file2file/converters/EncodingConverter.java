@@ -29,7 +29,7 @@ import joselusc.libraries.file2file.converters.interfaces.Converter;
  * </pre>
  * </p>
  */
-public class EncodingConverter implements Converter {
+public class EncodingConverter extends AbstractConverter {
 
     private static final List<String> DEFAULT_EXTENSIONS = Arrays.asList(
         ".java", ".js", ".jsp", ".xhtml", ".html", ".sql"
@@ -38,28 +38,43 @@ public class EncodingConverter implements Converter {
         "target", ".git", ".svn", "node_modules", "build", "out"
     ));
 
-    /**
-     * Converts all supported files in the specified directory from the default source encoding
-     * (windows-1252) to the default target encoding (UTF-8).
-     * <p>
-     * This method is provided for compatibility with the {@link Converter} interface.
-     * </p>
-     *
-     * @param inputPath the root directory to process
-     * @return the processed root directory
-     * @throws IOException if any I/O error occurs during conversion
-     */
-    @Override
-    public File convert(String inputPath) throws IOException {
-        return convertDirectory(
-            new File(inputPath),
-            Charset.forName("windows-1252"),
-            Charset.forName("UTF-8"),
-            DEFAULT_EXTENSIONS,
-            true,
-            false
-        );
+    private Charset sourceCharset = Charset.forName("windows-1252");
+    private Charset targetCharset = java.nio.charset.StandardCharsets.UTF_8;
+
+    public void setSourceCharset(Charset sourceCharset) {
+        this.sourceCharset = sourceCharset;
     }
+
+    public void setTargetCharset(Charset targetCharset) {
+        this.targetCharset = targetCharset;
+    }
+
+    @Override
+    protected String getTargetExtension() {
+        return ""; // Keeps the same extension
+    }
+
+    @Override
+    protected boolean acceptFile(Path file) {
+        String fileName = file.getFileName().toString().toLowerCase();
+        for (String ext : DEFAULT_EXTENSIONS) {
+            if (fileName.endsWith(ext)) return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected Charset detectCharset(Path path) throws IOException {
+        return sourceCharset;
+    }
+
+    @Override
+    protected void convertFile(Path source, Path target) throws IOException {
+        Charset charset = detectCharset(source);
+        String content = new String(Files.readAllBytes(source), charset);
+        Files.write(target, content.getBytes(targetCharset));
+    }
+
 
     /**
      * Converts all files with the specified extensions in the given directory (recursively)
