@@ -223,7 +223,7 @@ class Csh2ShConverterTest {
      */
     @Test
     void testGotoSecurity() throws IOException {
-        String cshScript = "goto \$(rm -rf /)\ngoto \"; echo injected; #";
+        String cshScript = "goto $(rm -rf /)\ngoto \"; echo injected; #";
         Path cshFile = tempDir.resolve("security.csh");
         Files.write(cshFile, cshScript.getBytes());
 
@@ -242,15 +242,15 @@ class Csh2ShConverterTest {
      */
     @Test
     void testGotoVariableSafe() throws IOException {
-        String cshScript = "goto \$VAR\ngoto \${VAR2}";
+        String cshScript = "goto $VAR\ngoto ${VAR2}";
         Path cshFile = tempDir.resolve("safe_vars.csh");
         Files.write(cshFile, cshScript.getBytes());
 
         File shFile = Csh2ShConverter.getInstance().convert(cshFile.toString());
         String shContent = new String(Files.readAllBytes(shFile.toPath()));
 
-        assertTrue(shContent.contains("\"\$VAR\""));
-        assertTrue(shContent.contains("\"\${VAR2}\""));
+        assertTrue(shContent.contains("\"$VAR\""));
+        assertTrue(shContent.contains("\"${VAR2}\""));
         assertFalse(shContent.contains("eval"));
     }
 
