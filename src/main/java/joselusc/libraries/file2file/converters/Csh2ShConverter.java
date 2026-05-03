@@ -42,7 +42,7 @@ import joselusc.libraries.file2file.converters.interfaces.Converter;
  *
  * @author joselusc
  */
-public class Csh2ShConverter implements Converter {
+public class Csh2ShConverter extends AbstractConverter {
 
     /**
      * Singleton instance of the converter.
@@ -53,6 +53,24 @@ public class Csh2ShConverter implements Converter {
      * Private constructor to enforce singleton pattern.
      */
     private Csh2ShConverter() {
+    }
+
+    @Override
+    protected String getTargetExtension() {
+        return ".sh";
+    }
+
+    @Override
+    protected boolean acceptFile(java.nio.file.Path file) {
+        return file.getFileName().toString().endsWith(".csh");
+    }
+
+    @Override
+    public void convert(java.nio.file.Path source, java.nio.file.Path target) throws java.io.IOException {
+        if (!java.nio.file.Files.isDirectory(source) && !source.getFileName().toString().endsWith(".csh")) {
+            throw new IllegalArgumentException("Expected a .csh file");
+        }
+        super.convert(source, target);
     }
 
     /**
@@ -86,66 +104,55 @@ public class Csh2ShConverter implements Converter {
      * @throws IllegalArgumentException if the input file does not have a <code>.csh</code> extension
      */
     @Override
-    public File convert(String inputCshFile) throws IOException {
-        File inputFile = new File(inputCshFile);
-
-        if (!inputFile.getName().endsWith(".csh")) {
-            throw new IllegalArgumentException("Expected a .csh file");
-        }
-        if (!inputFile.exists()) {
-            throw new FileNotFoundException("Input file does not exist: " + inputCshFile);
-        }
-
-        String outputFileName = inputFile.getName().replaceFirst("\\.csh$", ".sh");
-        File outputFile = new File(inputFile.getParent(), outputFileName);
-        Path inPath = inputFile.toPath();
-        Path outPath = outputFile.toPath();
-
+    protected String convertContent(String content) throws java.io.IOException {
         functionBlockOpen = false;
+        StringBuilder writer = new StringBuilder();
 
-        try (BufferedReader reader = Files.newBufferedReader(inPath, StandardCharsets.UTF_8);
-             BufferedWriter writer = Files.newBufferedWriter(outPath, StandardCharsets.UTF_8)) {
+        writer.append("#!/bin/bash\n");
+        boolean firstLineProcessed = false;
 
-            // Write the Bash shebang line
-            writer.write("#!/bin/bash\n");
+        String[] lines = content.split("\n", -1);
 
-            boolean firstLineProcessed = false;
-            String line;
-            while ((line = reader.readLine()) != null) {
-                // Normalize line endings
-                line = line.replace("\r", "");
+        for (int i=0; i < lines.length; i++) {
+            String line = lines[i];
+            line = line.replace("\r", "");
 
-                // Skip the original CSH shebang line
-                if (!firstLineProcessed) {
-                    firstLineProcessed = true;
-                    if (line.trim().startsWith("#!")) {
-                        continue;
-                    }
-                }
-
-                // Preserve blank lines
-                if (line.trim().isEmpty()) {
-                    writer.write("\n");
+            // Skip the original CSH shebang line
+            if (!firstLineProcessed) {
+                firstLineProcessed = true;
+                if (line.trim().startsWith("#!")) {
                     continue;
                 }
+            }
 
-                // Convert the current line and write the result
-                String converted = convertLine(line);
-                if (!converted.isEmpty()) {
-                    for (String subLine : converted.split("\n")) {
-                        writer.write(subLine);
-                        writer.write("\n");
+            // Preserve blank lines
+            if (line.trim().isEmpty()) {
+                if (i < lines.length - 1) writer.append("\n");
+                continue;
+            }
+
+            // Convert the current line and write the result
+            String converted = convertLine(line);
+            if (!converted.isEmpty()) {
+                String[] subLines = converted.split("\n");
+                for (int j=0; j < subLines.length; j++) {
+                    writer.append(subLines[j]);
+                    if (j < subLines.length - 1 || i < lines.length - 1) {
+                        writer.append("\n");
                     }
                 }
             }
-
-            // Close any open function block at the end of the file
-            if (functionBlockOpen) {
-                writer.write("}\n");
-            }
         }
 
-        return outputFile;
+        // Close any open function block at the end of the file
+        if (functionBlockOpen) {
+            if (!writer.toString().endsWith("\n")) {
+                writer.append("\n");
+            }
+            writer.append("}\n");
+        }
+
+        return writer.toString();
     }
 
     /**
@@ -156,7 +163,8 @@ public class Csh2ShConverter implements Converter {
      * @param line the original line from the CSH script
      * @return the converted Bash line(s) with preserved indentation
      */
-    private String convertLine(String line) {
+    @Override
+    protected String convertLine(String line) {
         String indent = getIndent(line);
         String trimmed = line.substring(indent.length());
 

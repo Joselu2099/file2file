@@ -39,10 +39,9 @@ public class FileConverter {
     /**
      * Entry point for the file2file command-line application.
      *
-     * @param args Command-line arguments. Requires -t &lt;target_type&gt; and &lt;input_file&gt;.
+     * @param args Command-line arguments.
      */
     public static void main(String[] args) {
-        // Define command-line options
         Options options = new Options();
         Option targetOption = Option.builder("t")
                 .required(true)
@@ -57,7 +56,6 @@ public class FileConverter {
                 .build();
         options.addOption(helpOption);
 
-        // Parse command-line arguments
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
@@ -65,62 +63,46 @@ public class FileConverter {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
             System.err.println("Error parsing arguments: " + e.getMessage());
-            formatter.printHelp("file2file.jar -t <target_type> <input_file>", options);
+            formatter.printHelp("file2file.jar -t <target_type> <source_path> [target_path]", options);
             System.exit(1);
         }
 
         if (cmd.hasOption("h")) {
-            formatter.printHelp("file2file.jar -t <target_type> <input_file>", options);
+            formatter.printHelp("file2file.jar -t <target_type> <source_path> [target_path]", options);
             System.exit(0);
         }
 
-        // Get the target type and input file from arguments
         String targetType = cmd.getOptionValue("t");
         String[] remainingArgs = cmd.getArgs();
-        if (remainingArgs.length != 1) {
-            System.err.println("Exactly one input file must be specified.");
-            formatter.printHelp("file2file.jar -t <target_type> <input_file>", options);
+
+        if (remainingArgs.length < 1 || remainingArgs.length > 2) {
+            System.err.println("You must specify a source path and optionally a target path.");
+            formatter.printHelp("file2file.jar -t <target_type> <source_path> [target_path]", options);
             System.exit(1);
         }
+
         String inputFilePath = remainingArgs[0];
 
-        // Perform the conversion
         try {
             Converter converter = ConverterFactory.getConverter(inputFilePath, targetType);
             if (converter == null) {
-                throw new IllegalArgumentException("No converter found for " 
-                        + inputFilePath + " -> " + targetType);
+                throw new IllegalArgumentException("No converter found for " + inputFilePath + " -> " + targetType);
             }
-            File outputFile = converter.convert(inputFilePath);
 
-            // Rename the output file with _CONVERTED and the appropriate extension
-            String outputPath = getConvertedFileName(inputFilePath, targetType);
-            File renamed = new File(outputPath);
-            if (outputFile.renameTo(renamed)) {
-                System.out.println("Conversion successful: " + renamed.getAbsolutePath());
+            if (remainingArgs.length == 2) {
+                // New way with source and target paths
+                java.nio.file.Path source = java.nio.file.Path.of(inputFilePath);
+                java.nio.file.Path target = java.nio.file.Path.of(remainingArgs[1]);
+                converter.convert(source, target);
+                System.out.println("Conversion successful: " + target.toAbsolutePath());
             } else {
-                System.out.println("Conversion completed, but the output file could not be renamed.");
+                // Legacy way
+                File outputFile = converter.convert(inputFilePath);
+                System.out.println("Conversion successful: " + outputFile.getAbsolutePath());
             }
         } catch (IllegalArgumentException | IOException e) {
             System.err.println("Error: " + e.getMessage());
             System.exit(1);
         }
-    }
-
-    /**
-     * Generates the output file name by appending "_CONVERTED" and the appropriate extension
-     * based on the target type.
-     *
-     * @param originalPath The path of the original input file.
-     * @param targetType   The target conversion type (e.g., "sh", "encoding").
-     * @return The absolute path of the converted file.
-     */
-    private static String getConvertedFileName(String originalPath, String targetType) {
-        File original = new File(originalPath);
-        String name = original.getName();
-        int dot = name.lastIndexOf('.');
-        String base = (dot > 0) ? name.substring(0, dot) : name;
-        String ext = (targetType.equals("sh")) ? ".sh" : ".txt";
-        return new File(original.getParent(), base + "_CONVERTED" + ext).getAbsolutePath();
     }
 }

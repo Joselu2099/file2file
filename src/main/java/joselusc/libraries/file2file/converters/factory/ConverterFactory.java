@@ -53,6 +53,11 @@ public class ConverterFactory {
         registerConverter("xhtml", "encoding", EncodingConverter::new);
         registerConverter("html", "encoding", EncodingConverter::new);
         registerConverter("txt", "encoding", EncodingConverter::new);
+
+        // Register new code migration converters
+        registerConverter("java", "junit5", joselusc.libraries.file2file.converters.JUnit4To5Converter::new);
+        registerConverter("java", "java-modern", joselusc.libraries.file2file.converters.JavaModernizerConverter::new);
+        registerConverter("py", "python3", joselusc.libraries.file2file.converters.Python2To3Converter::new);
     }
 
     /**
