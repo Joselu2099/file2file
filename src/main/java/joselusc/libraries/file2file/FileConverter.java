@@ -56,6 +56,13 @@ public class FileConverter {
                 .build();
         options.addOption(helpOption);
 
+        Option excludeOption = Option.builder("e")
+                .longOpt("exclude")
+                .hasArgs()
+                .valueSeparator(',')
+                .desc("Exclude directories or patterns")
+                .build();
+        options.addOption(excludeOption);
         Option dryRunOption = Option.builder()
                 .longOpt("dry-run")
                 .desc("Show what would be modified and a diff without writing to disk")
@@ -101,6 +108,9 @@ public class FileConverter {
                 throw new IllegalArgumentException("No converter found for " + inputFilePath + " -> " + targetType);
             }
 
+            if (cmd.hasOption("e")) {
+                converter.setExcludes(java.util.Arrays.asList(cmd.getOptionValues("e")));
+            }
             if (cmd.hasOption("dry-run")) {
                 converter.setDryRun(true);
             }

@@ -62,6 +62,23 @@ class NewConvertersTest {
                        "        List<String> list = new ArrayList<String>();\n" +
                        "        Map<String, Integer> map = new HashMap<String, Integer>();\n" +
                        "    }\n" +
+                       "    public String switchTest(int x) {\n" +
+                       "        switch (x) {\n" +
+                       "            case 1: return \"One\";\n" +
+                       "            case 2: System.out.println(\"Two\"); break;\n" +
+                       "        }\n" +
+                       "        return \"\";\n" +
+                       "    }\n" +
+                       "    public String textBlockTest() {\n" +
+                       "        return \"SELECT * FROM table \" +\n" +
+                       "               \"WHERE id = 1\";\n" +
+                       "    }\n" +
+                       "}\n" +
+                       "public class Point {\n" +
+                       "    private final int x;\n" +
+                       "    public Point(int x) {\n" +
+                       "        this.x = x;\n" +
+                       "    }\n" +
                        "}\n";
 
         Files.writeString(source, input);
@@ -73,6 +90,38 @@ class NewConvertersTest {
 
         assertTrue(output.contains("List<String> list = new ArrayList<>();"));
         assertTrue(output.contains("Map<String, Integer> map = new HashMap<>();"));
+        assertTrue(output.contains("case 1 -> \"One\";"));
+        assertTrue(output.contains("case 2 -> { System.out.println(\"Two\"); }"));
+        assertTrue(output.contains("\"\"\"\nSELECT * FROM table WHERE id = 1\"\"\""));
+        assertTrue(output.contains("public record Point(int x) {}"));
+    }
+
+    @Test
+    void testPropertiesToYamlConverter() throws IOException {
+        Path source = tempDir.resolve("config.properties");
+        Path target = tempDir.resolve("config_Converted.yml");
+
+        String input = "server.port=8080\n" +
+                       "server.host=localhost\n" +
+                       "database.url=jdbc:mysql://localhost:3306/db\n" +
+                       "database.credentials.user=admin\n" +
+                       "database.credentials.password=secret\n";
+
+        Files.writeString(source, input);
+
+        PropertiesToYamlConverter converter = new PropertiesToYamlConverter();
+        converter.convert(source, target);
+
+        String output = Files.readString(target);
+
+        assertTrue(output.contains("server:"));
+        assertTrue(output.contains("port: \"8080\""));
+        assertTrue(output.contains("host: \"localhost\""));
+        assertTrue(output.contains("database:"));
+        assertTrue(output.contains("url: \"jdbc:mysql://localhost:3306/db\""));
+        assertTrue(output.contains("credentials:"));
+        assertTrue(output.contains("user: \"admin\""));
+        assertTrue(output.contains("password: \"secret\""));
     }
 
     @Test
