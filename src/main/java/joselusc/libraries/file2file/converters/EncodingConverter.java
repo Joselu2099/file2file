@@ -4,6 +4,8 @@ import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import joselusc.libraries.file2file.converters.interfaces.Converter;
 
@@ -30,6 +32,8 @@ import joselusc.libraries.file2file.converters.interfaces.Converter;
  * </p>
  */
 public class EncodingConverter extends AbstractConverter {
+
+    private static final Logger logger = Logger.getLogger(EncodingConverter.class.getName());
 
     private static final List<String> DEFAULT_EXTENSIONS = Arrays.asList(
         ".java", ".js", ".jsp", ".xhtml", ".html", ".sql"
@@ -157,15 +161,15 @@ public class EncodingConverter extends AbstractConverter {
             sourceEncoding = Charset.forName(args[1]);
             targetEncoding = Charset.forName(args[2]);
         } catch (Exception e) {
-            System.out.println("Unsupported encoding: " + e.getMessage());
+            logger.log(Level.SEVERE, "Unsupported encoding: " + e.getMessage());
             return;
         }
 
         try {
             convertDirectory(root, sourceEncoding, targetEncoding, extensions, backup, silent);
-            if (!silent) System.out.println("Conversion finished.");
+            if (!silent) logger.info("Conversion finished.");
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            logger.log(Level.SEVERE, "Error: " + e.getMessage());
         }
     }
 
@@ -249,9 +253,9 @@ public class EncodingConverter extends AbstractConverter {
             try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(file, false), targetEncoding)) {
                 writer.write(content);
             }
-            if (!silent) System.out.println("Converted: " + file.getPath());
+            if (!silent) logger.info("Converted: " + file.getPath());
         } catch (IOException e) {
-            System.err.println("Error: " + file.getPath() + " → " + e.getMessage());
+            logger.log(Level.SEVERE, "Error: " + file.getPath() + " → " + e.getMessage());
         }
     }
 }

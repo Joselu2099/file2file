@@ -7,9 +7,13 @@ import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 public abstract class AbstractConverter implements Converter {
+
+    private static final Logger logger = Logger.getLogger(AbstractConverter.class.getName());
 
     /**
      * Provides the target extension (including the dot, e.g., ".sh", ".java").
@@ -85,7 +89,7 @@ public abstract class AbstractConverter implements Converter {
                             convertFile(p, targetFile);
                         }
                     } catch (IOException e) {
-                        System.err.println("Failed to convert file " + p + ": " + e.getMessage());
+                        logger.log(Level.SEVERE, "Failed to convert file " + p + ": " + e.getMessage());
                     }
                 });
             }
