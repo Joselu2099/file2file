@@ -58,6 +58,7 @@ public class ConverterFactory {
         registerConverter("java", "junit5", joselusc.libraries.file2file.converters.JUnit4To5Converter::new);
         registerConverter("java", "java-modern", joselusc.libraries.file2file.converters.JavaModernizerConverter::new);
         registerConverter("py", "python3", joselusc.libraries.file2file.converters.Python2To3Converter::new);
+        registerConverter("properties", "yml", joselusc.libraries.file2file.converters.PropertiesToYamlConverter::new);
     }
 
     /**
