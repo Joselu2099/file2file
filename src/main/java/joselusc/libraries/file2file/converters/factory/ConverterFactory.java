@@ -58,6 +58,12 @@ public class ConverterFactory {
         registerConverter("java", "junit5", joselusc.libraries.file2file.converters.JUnit4To5Converter::new);
         registerConverter("java", "java-modern", joselusc.libraries.file2file.converters.JavaModernizerConverter::new);
         registerConverter("py", "python3", joselusc.libraries.file2file.converters.Python2To3Converter::new);
+
+        // Register cross-shell script converters
+        registerConverter("ps1", "sh", joselusc.libraries.file2file.converters.PowerShellToBashConverter::new);
+        registerConverter("sh", "ps1", joselusc.libraries.file2file.converters.BashToPowerShellConverter::new);
+        registerConverter("bat", "sh", joselusc.libraries.file2file.converters.BatchToBashConverter::new);
+        registerConverter("cmd", "sh", joselusc.libraries.file2file.converters.BatchToBashConverter::new);
     }
 
     /**
