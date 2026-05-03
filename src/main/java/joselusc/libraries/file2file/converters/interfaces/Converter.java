@@ -18,6 +18,23 @@ public interface Converter {
     void convert(Path source, Path target) throws IOException;
 
     /**
+     * Configures the dry-run mode. If true, no files should be modified.
+     * @param dryRun true to enable dry-run mode
+     */
+    default void setDryRun(boolean dryRun) {
+        // Default implementation does nothing
+    }
+
+    /**
+     * Configures the backup mode. If true, existing files should be backed up
+     * before being overwritten.
+     * @param backup true to enable backup mode
+     */
+    default void setBackup(boolean backup) {
+        // Default implementation does nothing
+    }
+
+    /**
      * Converts the specified input file and returns the resulting output file.
      * Legacy method for backward compatibility.
      *

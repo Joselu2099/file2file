@@ -56,6 +56,18 @@ public class FileConverter {
                 .build();
         options.addOption(helpOption);
 
+        Option dryRunOption = Option.builder()
+                .longOpt("dry-run")
+                .desc("Show what would be modified and a diff without writing to disk")
+                .build();
+        options.addOption(dryRunOption);
+
+        Option backupOption = Option.builder()
+                .longOpt("backup")
+                .desc("Create a backup copy (.bak) before overwriting any file")
+                .build();
+        options.addOption(backupOption);
+
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
@@ -87,6 +99,13 @@ public class FileConverter {
             Converter converter = ConverterFactory.getConverter(inputFilePath, targetType);
             if (converter == null) {
                 throw new IllegalArgumentException("No converter found for " + inputFilePath + " -> " + targetType);
+            }
+
+            if (cmd.hasOption("dry-run")) {
+                converter.setDryRun(true);
+            }
+            if (cmd.hasOption("backup")) {
+                converter.setBackup(true);
             }
 
             if (remainingArgs.length == 2) {
