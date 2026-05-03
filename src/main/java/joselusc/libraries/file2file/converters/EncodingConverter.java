@@ -4,6 +4,8 @@ import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import joselusc.libraries.file2file.converters.interfaces.Converter;
 
@@ -165,7 +167,7 @@ public class EncodingConverter extends AbstractConverter {
             convertDirectory(root, sourceEncoding, targetEncoding, extensions, backup, silent);
             if (!silent) System.out.println("Conversion finished.");
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            LOGGER.severe("Error: " + e.getMessage());
         }
     }
 
@@ -251,7 +253,7 @@ public class EncodingConverter extends AbstractConverter {
             }
             if (!silent) System.out.println("Converted: " + file.getPath());
         } catch (IOException e) {
-            System.err.println("Error: " + file.getPath() + " → " + e.getMessage());
+            LOGGER.severe("Error: " + file.getPath() + " 2192 " + e.getMessage());
         }
     }
 }
