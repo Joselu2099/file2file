@@ -18,6 +18,12 @@ public interface Converter {
     void convert(Path source, Path target) throws IOException;
 
     /**
+     * Sets a list of directories or patterns to exclude during the conversion process.
+     * @param excludes a list of patterns to exclude
+     */
+    default void setExcludes(java.util.List<String> excludes) {}
+
+    /**
      * Configures the dry-run mode. If true, no files should be modified.
      * @param dryRun true to enable dry-run mode
      */

@@ -8,8 +8,41 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
+import java.util.logging.Logger;
+import java.util.logging.Level;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class AbstractConverter implements Converter {
+    protected List<String> excludes = new ArrayList<>();
+    protected static final Logger LOGGER = Logger.getLogger(AbstractConverter.class.getName());
+    @Override
+    public void setExcludes(List<String> excludes) {
+        if (excludes != null) {
+            this.excludes = new ArrayList<>(excludes);
+        }
+    }
+    protected boolean isExcluded(Path path) {
+        if (excludes == null || excludes.isEmpty()) return false;
+        Path fileNamePath = path.getFileName();
+        if (fileNamePath == null) return false;
+        String fileName = fileNamePath.toString();
+        for (String pattern : excludes) {
+            if (fileName.equals(pattern)) {
+                return true;
+            }
+            try {
+                if (FileSystems.getDefault().getPathMatcher("glob:" + pattern).matches(path.getFileName())) {
+                    return true;
+                }
+            } catch (Exception e) { LOGGER.log(Level.WARNING, "Failed to match exclusion pattern " + pattern, e); }
+        }
+        return false;
+    }
 
     protected boolean dryRun = false;
     protected boolean backup = false;
