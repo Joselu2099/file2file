@@ -7,6 +7,15 @@ import java.util.Stack;
 
 public class BashToPowerShellConverter extends AbstractConverter {
 
+    private static final Pattern VAR_PATTERN = Pattern.compile("^([a-zA-Z0-9_]+)=(.+)$");
+    private static final Pattern IF_PATTERN = Pattern.compile("^if\\s*\\[\\s*(.*)\\s*\\];?\\s*then$");
+    private static final Pattern IF_NO_THEN_PATTERN = Pattern.compile("^if\\s*\\[\\s*(.*)\\s*\\]$");
+    private static final Pattern ELIF_PATTERN = Pattern.compile("^elif\\s*\\[\\s*(.*)\\s*\\];?\\s*then$");
+    private static final Pattern FOR_PATTERN = Pattern.compile("^for\\s+([a-zA-Z0-9_]+)\\s+in\\s+([^;]+);?\\s*do$");
+    private static final Pattern FOR_NO_DO_PATTERN = Pattern.compile("^for\\s+([a-zA-Z0-9_]+)\\s+in\\s+([^;]+);?$");
+    private static final Pattern FUNC_PATTERN = Pattern.compile("^([a-zA-Z0-9_]+)\\(\\)\\s*\\{?$");
+    private static final Pattern INDENT_PATTERN = Pattern.compile("^(\\s*)");
+
     private Stack<String> blockStack = new Stack<>();
 
     public BashToPowerShellConverter() {
@@ -57,29 +66,25 @@ public class BashToPowerShellConverter extends AbstractConverter {
             return indent + "Write-Host " + trimmed.substring(5).trim();
         }
 
-        Pattern varPattern = Pattern.compile("^([a-zA-Z0-9_]+)=(.+)$");
-        Matcher varMatcher = varPattern.matcher(trimmed);
+        Matcher varMatcher = VAR_PATTERN.matcher(trimmed);
         if (varMatcher.find()) {
             return indent + "$" + varMatcher.group(1) + " = " + varMatcher.group(2);
         }
 
-        Pattern ifPattern = Pattern.compile("^if\\s*\\[\\s*(.*)\\s*\\];?\\s*then$");
-        Matcher ifMatcher = ifPattern.matcher(trimmed);
+        Matcher ifMatcher = IF_PATTERN.matcher(trimmed);
         if (ifMatcher.find()) {
             blockStack.push("if");
             String condition = psifyCondition(ifMatcher.group(1).trim());
             return indent + "if (" + condition + ") {";
         }
 
-        Pattern ifNoThenPattern = Pattern.compile("^if\\s*\\[\\s*(.*)\\s*\\]$");
-        Matcher ifNoThenMatcher = ifNoThenPattern.matcher(trimmed);
+        Matcher ifNoThenMatcher = IF_NO_THEN_PATTERN.matcher(trimmed);
         if (ifNoThenMatcher.find()) {
             String condition = psifyCondition(ifNoThenMatcher.group(1).trim());
             return indent + "if (" + condition + ")";
         }
 
-        Pattern elifPattern = Pattern.compile("^elif\\s*\\[\\s*(.*)\\s*\\];?\\s*then$");
-        Matcher elifMatcher = elifPattern.matcher(trimmed);
+        Matcher elifMatcher = ELIF_PATTERN.matcher(trimmed);
         if (elifMatcher.find()) {
             String condition = psifyCondition(elifMatcher.group(1).trim());
             return indent + "} elseif (" + condition + ") {";
@@ -101,15 +106,13 @@ public class BashToPowerShellConverter extends AbstractConverter {
             return indent + "}";
         }
 
-        Pattern forPattern = Pattern.compile("^for\\s+([a-zA-Z0-9_]+)\\s+in\\s+([^;]+);?\\s*do$");
-        Matcher forMatcher = forPattern.matcher(trimmed);
+        Matcher forMatcher = FOR_PATTERN.matcher(trimmed);
         if (forMatcher.find()) {
             blockStack.push("for");
             return indent + "foreach ($" + forMatcher.group(1) + " in " + forMatcher.group(2).trim() + ") {";
         }
 
-        Pattern forNoDoPattern = Pattern.compile("^for\\s+([a-zA-Z0-9_]+)\\s+in\\s+([^;]+);?$");
-        Matcher forNoDoMatcher = forNoDoPattern.matcher(trimmed);
+        Matcher forNoDoMatcher = FOR_NO_DO_PATTERN.matcher(trimmed);
         if (forNoDoMatcher.find()) {
             return indent + "foreach ($" + forNoDoMatcher.group(1) + " in " + forNoDoMatcher.group(2).trim() + ")";
         }
@@ -126,8 +129,7 @@ public class BashToPowerShellConverter extends AbstractConverter {
             return indent + "}";
         }
 
-        Pattern funcPattern = Pattern.compile("^([a-zA-Z0-9_]+)\\(\\)\\s*\\{?$");
-        Matcher funcMatcher = funcPattern.matcher(trimmed);
+        Matcher funcMatcher = FUNC_PATTERN.matcher(trimmed);
         if (funcMatcher.find()) {
             if (trimmed.endsWith("{")) {
                 blockStack.push("function");
@@ -153,8 +155,7 @@ public class BashToPowerShellConverter extends AbstractConverter {
     }
 
     private String getIndent(String line) {
-        Pattern pattern = Pattern.compile("^(\\s*)");
-        Matcher matcher = pattern.matcher(line);
+        Matcher matcher = INDENT_PATTERN.matcher(line);
         return matcher.find() ? matcher.group(1) : "";
     }
 }
