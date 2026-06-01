@@ -44,6 +44,19 @@ import joselusc.libraries.file2file.converters.interfaces.Converter;
  */
 public class Csh2ShConverter extends AbstractConverter {
 
+    private static final Pattern SETENV_PATTERN = Pattern.compile("^setenv\\s+(\\S+)\\s+(\\S+)");
+    private static final Pattern SET_PATTERN = Pattern.compile("^set\\s+(\\S+)\\s*=\\s*(.+)");
+    private static final Pattern CD_PATTERN = Pattern.compile("^cd\\s+([^\"].+)$");
+    private static final Pattern IF_GOTO_PATTERN = Pattern.compile("^if\\s*\\((.+)\\)\\s*goto\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$");
+    private static final Pattern IF_NEG_PATTERN = Pattern.compile("^if\\s*!\\(\\s*(.+?)\\s*\\)\\s*then");
+    private static final Pattern IF_PATTERN = Pattern.compile("^if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
+    private static final Pattern ELSE_IF_PATTERN = Pattern.compile("^else\\s+if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
+    private static final Pattern WHILE_PATTERN = Pattern.compile("^while\\s*\\(\\s*(.+?)\\s*\\)\\s*");
+    private static final Pattern FOREACH_PATTERN = Pattern.compile("^foreach\\s+(\\S+)\\s+\\((.+)\\)");
+    private static final Pattern SWITCH_PATTERN = Pattern.compile("^switch\\s*\\(\\s*\\$?(\\w+)\\s*\\)");
+    private static final Pattern ALIAS_PATTERN = Pattern.compile("^alias\\s+(\\S+)\\s+(.*)");
+    private static final Pattern INDENT_PATTERN = Pattern.compile("^(\\s*)");
+
     /**
      * Singleton instance of the converter.
      */
@@ -219,15 +232,13 @@ public class Csh2ShConverter extends AbstractConverter {
         }
 
         // setenv VAR VALUE -> export VAR=VALUE
-        Pattern setenvPattern = Pattern.compile("^setenv\\s+(\\S+)\\s+(\\S+)");
-        Matcher setenvMatcher = setenvPattern.matcher(trimmed);
+        Matcher setenvMatcher = SETENV_PATTERN.matcher(trimmed);
         if (setenvMatcher.find()) {
             return "export " + setenvMatcher.group(1) + "=" + setenvMatcher.group(2);
         }
 
         // set VAR = VALUE -> VAR=VALUE (preserve quotes if present)
-        Pattern setPattern = Pattern.compile("^set\\s+(\\S+)\\s*=\\s*(.+)");
-        Matcher setMatcher = setPattern.matcher(trimmed);
+        Matcher setMatcher = SET_PATTERN.matcher(trimmed);
         if (setMatcher.find()) {
             String var = setMatcher.group(1);
             String val = setMatcher.group(2).trim();
@@ -242,15 +253,13 @@ public class Csh2ShConverter extends AbstractConverter {
         }
 
         // cd path -> cd "path" (if not already quoted)
-        Pattern cdPattern = Pattern.compile("^cd\\s+([^\"].+)$");
-        Matcher cdMatcher = cdPattern.matcher(trimmed);
+        Matcher cdMatcher = CD_PATTERN.matcher(trimmed);
         if (cdMatcher.find()) {
             return "cd \"" + cdMatcher.group(1).trim() + "\"";
         }
 
         // Detecta: if ($var == valor) goto label
-        Pattern ifGotoPattern = Pattern.compile("^if\\s*\\((.+)\\)\\s*goto\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$");
-        Matcher ifGotoMatcher = ifGotoPattern.matcher(trimmed);
+        Matcher ifGotoMatcher = IF_GOTO_PATTERN.matcher(trimmed);
         if (ifGotoMatcher.find()) {
             String condition = ifGotoMatcher.group(1).trim();
             String label = ifGotoMatcher.group(2).trim();
@@ -262,16 +271,14 @@ public class Csh2ShConverter extends AbstractConverter {
         }
 
         // if !(condition) then -> if [ ! condition ]; then
-        Pattern ifNegPattern = Pattern.compile("^if\\s*!\\(\\s*(.+?)\\s*\\)\\s*then");
-        Matcher ifNegMatcher = ifNegPattern.matcher(trimmed);
+        Matcher ifNegMatcher = IF_NEG_PATTERN.matcher(trimmed);
         if (ifNegMatcher.find()) {
             String condition = ifNegMatcher.group(1);
             return "if [ ! " + bashifyCondition(condition) + " ]; then";
         }
 
         // if ($VAR == VALUE) then -> if [ "$VAR" = "VALUE" ]; then
-        Pattern ifPattern = Pattern.compile("^if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
-        Matcher ifMatcher = ifPattern.matcher(trimmed);
+        Matcher ifMatcher = IF_PATTERN.matcher(trimmed);
         if (ifMatcher.find()) {
             String var = ifMatcher.group(1);
             String op = ifMatcher.group(2).equals("==") ? "=" : ifMatcher.group(2);
@@ -280,8 +287,7 @@ public class Csh2ShConverter extends AbstractConverter {
         }
 
         // else if ($VAR == VALUE) then -> elif [ "$VAR" = "VALUE" ]; then
-        Pattern elseIfPattern = Pattern.compile("^else\\s+if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
-        Matcher elseIfMatcher = elseIfPattern.matcher(trimmed);
+        Matcher elseIfMatcher = ELSE_IF_PATTERN.matcher(trimmed);
         if (elseIfMatcher.find()) {
             String var = elseIfMatcher.group(1);
             String op = elseIfMatcher.group(2).equals("==") ? "=" : elseIfMatcher.group(2);
@@ -300,23 +306,20 @@ public class Csh2ShConverter extends AbstractConverter {
         }
 
         // while (condition) -> while [ condition ]; do
-        Pattern whilePattern = Pattern.compile("^while\\s*\\(\\s*(.+?)\\s*\\)\\s*");
-        Matcher whileMatcher = whilePattern.matcher(trimmed);
+        Matcher whileMatcher = WHILE_PATTERN.matcher(trimmed);
         if (whileMatcher.find() && trimmed.endsWith(")")) {
             String condition = whileMatcher.group(1);
             return "while [ " + bashifyCondition(condition) + " ]; do";
         }
 
         // foreach VAR (LIST) -> for VAR in LIST; do
-        Pattern foreachPattern = Pattern.compile("^foreach\\s+(\\S+)\\s+\\((.+)\\)");
-        Matcher foreachMatcher = foreachPattern.matcher(trimmed);
+        Matcher foreachMatcher = FOREACH_PATTERN.matcher(trimmed);
         if (foreachMatcher.find()) {
             return "for " + foreachMatcher.group(1) + " in " + foreachMatcher.group(2).trim() + "; do";
         }
 
         // switch ($var) -> case "$var" in
-        Pattern switchPattern = Pattern.compile("^switch\\s*\\(\\s*\\$?(\\w+)\\s*\\)");
-        Matcher switchMatcher = switchPattern.matcher(trimmed);
+        Matcher switchMatcher = SWITCH_PATTERN.matcher(trimmed);
         if (switchMatcher.find()) {
             return "case \"$" + switchMatcher.group(1) + "\" in";
         }
@@ -351,8 +354,7 @@ public class Csh2ShConverter extends AbstractConverter {
         }
 
         // alias and unalias
-        Pattern aliasPattern = Pattern.compile("^alias\\s+(\\S+)\\s+(.*)");
-        Matcher aliasMatcher = aliasPattern.matcher(trimmed);
+        Matcher aliasMatcher = ALIAS_PATTERN.matcher(trimmed);
         if (aliasMatcher.find()) {
             String name = aliasMatcher.group(1);
             String value = aliasMatcher.group(2).trim();
@@ -439,8 +441,7 @@ public class Csh2ShConverter extends AbstractConverter {
      * @return a string containing only the leading whitespace
      */
     private String getIndent(String line) {
-        Pattern pattern = Pattern.compile("^(\\s*)");
-        Matcher matcher = pattern.matcher(line);
+        Matcher matcher = INDENT_PATTERN.matcher(line);
         return matcher.find() ? matcher.group(1) : "";
     }
 }
