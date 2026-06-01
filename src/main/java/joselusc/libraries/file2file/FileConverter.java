@@ -2,6 +2,8 @@ package joselusc.libraries.file2file;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.cli.*;
 
 import joselusc.libraries.file2file.converters.interfaces.Converter;
@@ -35,6 +37,8 @@ import joselusc.libraries.file2file.converters.factory.ConverterFactory;
  * @author Jose Luis Sanchez Carrasco
  */
 public class FileConverter {
+
+    private static final Logger LOGGER = Logger.getLogger(FileConverter.class.getName());
 
     /**
      * Entry point for the file2file command-line application.
@@ -130,6 +134,7 @@ public class FileConverter {
                 System.out.println("Conversion successful: " + outputFile.getAbsolutePath());
             }
         } catch (IllegalArgumentException | IOException e) {
+            LOGGER.log(Level.SEVERE, "Error during conversion", e);
             System.err.println("Error: " + e.getMessage());
             System.exit(1);
         }
