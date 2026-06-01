@@ -7,6 +7,13 @@ import java.util.Stack;
 
 public class PowerShellToBashConverter extends AbstractConverter {
 
+    private static final Pattern INDENT_PATTERN = Pattern.compile("^(\\s*)");
+    private static final Pattern VAR_PATTERN = Pattern.compile("^\\$([a-zA-Z0-9_]+)\\s*=\\s*(.*)$");
+    private static final Pattern IF_PATTERN = Pattern.compile("^if\\s*\\((.*)\\)\\s*\\{?$");
+    private static final Pattern ELSEIF_PATTERN = Pattern.compile("^elseif\\s*\\((.*)\\)\\s*\\{?$");
+    private static final Pattern FOREACH_PATTERN = Pattern.compile("^foreach\\s*\\(\\$([a-zA-Z0-9_]+)\\s+in\\s+(.*)\\)\\s*\\{?$");
+    private static final Pattern FUNC_PATTERN = Pattern.compile("^function\\s+([a-zA-Z0-9_]+)\\s*\\{?$");
+
     private Stack<String> blockStack = new Stack<>();
 
     public PowerShellToBashConverter() {
@@ -61,14 +68,12 @@ public class PowerShellToBashConverter extends AbstractConverter {
             return indent + "echo " + trimmed.substring(11).trim();
         }
 
-        Pattern varPattern = Pattern.compile("^\\$([a-zA-Z0-9_]+)\\s*=\\s*(.*)$");
-        Matcher varMatcher = varPattern.matcher(trimmed);
+        Matcher varMatcher = VAR_PATTERN.matcher(trimmed);
         if (varMatcher.find()) {
             return indent + varMatcher.group(1) + "=" + varMatcher.group(2);
         }
 
-        Pattern ifPattern = Pattern.compile("^if\\s*\\((.*)\\)\\s*\\{?$");
-        Matcher ifMatcher = ifPattern.matcher(trimmed);
+        Matcher ifMatcher = IF_PATTERN.matcher(trimmed);
         if (ifMatcher.find()) {
             String condition = bashifyCondition(ifMatcher.group(1).trim());
             if (trimmed.endsWith("{")) {
@@ -79,8 +84,7 @@ public class PowerShellToBashConverter extends AbstractConverter {
             }
         }
 
-        Pattern elseifPattern = Pattern.compile("^elseif\\s*\\((.*)\\)\\s*\\{?$");
-        Matcher elseifMatcher = elseifPattern.matcher(trimmed);
+        Matcher elseifMatcher = ELSEIF_PATTERN.matcher(trimmed);
         if (elseifMatcher.find()) {
             String condition = bashifyCondition(elseifMatcher.group(1).trim());
             if (trimmed.endsWith("{")) {
@@ -93,8 +97,7 @@ public class PowerShellToBashConverter extends AbstractConverter {
             return indent + "else";
         }
 
-        Pattern foreachPattern = Pattern.compile("^foreach\\s*\\(\\$([a-zA-Z0-9_]+)\\s+in\\s+(.*)\\)\\s*\\{?$");
-        Matcher foreachMatcher = foreachPattern.matcher(trimmed);
+        Matcher foreachMatcher = FOREACH_PATTERN.matcher(trimmed);
         if (foreachMatcher.find()) {
             if (trimmed.endsWith("{")) {
                 blockStack.push("for");
@@ -128,8 +131,7 @@ public class PowerShellToBashConverter extends AbstractConverter {
             return indent + "}";
         }
 
-        Pattern funcPattern = Pattern.compile("^function\\s+([a-zA-Z0-9_]+)\\s*\\{?$");
-        Matcher funcMatcher = funcPattern.matcher(trimmed);
+        Matcher funcMatcher = FUNC_PATTERN.matcher(trimmed);
         if (funcMatcher.find()) {
             if (trimmed.endsWith("{")) {
                 blockStack.push("function");
@@ -147,8 +149,7 @@ public class PowerShellToBashConverter extends AbstractConverter {
     }
 
     private String getIndent(String line) {
-        Pattern pattern = Pattern.compile("^(\\s*)");
-        Matcher matcher = pattern.matcher(line);
+        Matcher matcher = INDENT_PATTERN.matcher(line);
         return matcher.find() ? matcher.group(1) : "";
     }
 }
