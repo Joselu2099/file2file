@@ -132,7 +132,7 @@ public abstract class AbstractConverter implements Converter {
                             convertFile(p, targetFile);
                         }
                     } catch (IOException e) {
-                        System.err.println("Failed to convert file " + p + ": " + e.getMessage());
+                        LOGGER.log(Level.SEVERE, "Failed to convert file " + p, e);
                     }
                 });
             }

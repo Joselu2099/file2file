@@ -165,7 +165,7 @@ public class EncodingConverter extends AbstractConverter {
             convertDirectory(root, sourceEncoding, targetEncoding, extensions, backup, silent);
             if (!silent) System.out.println("Conversion finished.");
         } catch (Exception e) {
-            LOGGER.severe("Error: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error during directory conversion", e);
         }
     }
 
@@ -251,7 +251,7 @@ public class EncodingConverter extends AbstractConverter {
             }
             if (!silent) System.out.println("Converted: " + file.getPath());
         } catch (IOException e) {
-            LOGGER.severe("Error: " + file.getPath() + " 2192 " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error converting file: " + file.getPath(), e);
         }
     }
 }

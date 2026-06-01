@@ -13,11 +13,15 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class File2FileGUI extends JFrame {
+
+    private static final Logger LOGGER = Logger.getLogger(File2FileGUI.class.getName());
 
     private JTextField fileField;
     private JComboBox<String> converterCombo;
@@ -176,6 +180,7 @@ public class File2FileGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Conversion done, but could not rename the file.", "Warning", JOptionPane.WARNING_MESSAGE);
             }
         } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Error during conversion", ex);
             JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
