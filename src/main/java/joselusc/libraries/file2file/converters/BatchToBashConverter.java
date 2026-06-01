@@ -7,6 +7,12 @@ import java.util.Stack;
 
 public class BatchToBashConverter extends AbstractConverter {
 
+    private static final Pattern VAR_PATTERN = Pattern.compile("%([a-zA-Z0-9_]+)%");
+    private static final Pattern SET_PATTERN = Pattern.compile("^set\\s+([a-zA-Z0-9_]+)=(.+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IF_PATTERN = Pattern.compile("^if\\s+(not\\s+)?(exist\\s+)?(.+?)\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FOR_PATTERN = Pattern.compile("^for\\s+%%([a-zA-Z])\\s+in\\s+\\((.*)\\)\\s*do\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern INDENT_PATTERN = Pattern.compile("^(\\s*)");
+
     private Stack<String> blockStack = new Stack<>();
 
     public BatchToBashConverter() {
@@ -63,14 +69,12 @@ public class BatchToBashConverter extends AbstractConverter {
             return indent + "echo " + convertVariables(trimmed.substring(5).trim());
         }
 
-        Pattern setPattern = Pattern.compile("^set\\s+([a-zA-Z0-9_]+)=(.+)$", Pattern.CASE_INSENSITIVE);
-        Matcher setMatcher = setPattern.matcher(trimmed);
+        Matcher setMatcher = SET_PATTERN.matcher(trimmed);
         if (setMatcher.find()) {
             return indent + setMatcher.group(1) + "=" + convertVariables(setMatcher.group(2));
         }
 
-        Pattern ifPattern = Pattern.compile("^if\\s+(not\\s+)?(exist\\s+)?(.+?)\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
-        Matcher ifMatcher = ifPattern.matcher(trimmed);
+        Matcher ifMatcher = IF_PATTERN.matcher(trimmed);
         if (ifMatcher.find()) {
             String not = ifMatcher.group(1);
             String exist = ifMatcher.group(2);
@@ -95,8 +99,7 @@ public class BatchToBashConverter extends AbstractConverter {
             }
         }
 
-        Pattern forPattern = Pattern.compile("^for\\s+%%([a-zA-Z])\\s+in\\s+\\((.*)\\)\\s*do\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
-        Matcher forMatcher = forPattern.matcher(trimmed);
+        Matcher forMatcher = FOR_PATTERN.matcher(trimmed);
         if (forMatcher.find()) {
             String var = forMatcher.group(1);
             String items = convertVariables(forMatcher.group(2));
@@ -136,8 +139,7 @@ public class BatchToBashConverter extends AbstractConverter {
     }
 
     private String convertVariables(String str) {
-        Pattern varPattern = Pattern.compile("%([a-zA-Z0-9_]+)%");
-        Matcher matcher = varPattern.matcher(str);
+        Matcher matcher = VAR_PATTERN.matcher(str);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
             matcher.appendReplacement(sb, "\\$" + matcher.group(1));
@@ -158,8 +160,7 @@ public class BatchToBashConverter extends AbstractConverter {
     }
 
     private String getIndent(String line) {
-        Pattern pattern = Pattern.compile("^(\\s*)");
-        Matcher matcher = pattern.matcher(line);
+        Matcher matcher = INDENT_PATTERN.matcher(line);
         return matcher.find() ? matcher.group(1) : "";
     }
 }
