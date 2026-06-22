@@ -9,6 +9,8 @@ import java.util.regex.Matcher;
  */
 public class JavaModernizerConverter extends AbstractConverter {
 
+    private static final Pattern DIAMOND_PATTERN = Pattern.compile("(=[\\s]*new[\\s]+[A-Za-z0-9_]+)<[A-Za-z0-9_,\\s\\?]+>\\s*\\(");
+
     @Override
     protected String getTargetExtension() {
         return ".java";
@@ -23,8 +25,7 @@ public class JavaModernizerConverter extends AbstractConverter {
     protected String convertLine(String line) {
         // Add diamond operator
         // List<String> list = new ArrayList<String>(); -> List<String> list = new ArrayList<>();
-        Pattern diamondPattern = Pattern.compile("(=[\\s]*new[\\s]+[A-Za-z0-9_]+)<[A-Za-z0-9_,\\s\\?]+>\\s*\\(");
-        Matcher matcher = diamondPattern.matcher(line);
+        Matcher matcher = DIAMOND_PATTERN.matcher(line);
         line = matcher.replaceAll("$1<>(");
 
         return line;
