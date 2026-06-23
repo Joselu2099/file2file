@@ -32,6 +32,10 @@ jobs:
       id: get_version
       run: |
         VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        if [ -z "$VERSION" ]; then
+          echo "ERROR: Could not extract project version from pom.xml"
+          exit 1
+        fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Check if tag exists
@@ -71,7 +75,8 @@ jobs:
 
     - name: Create GitHub Release
       if: steps.check_tag.outputs.tag_exists == 'false'
-      uses: softprops/action-gh-release@v2
+      # softprops/action-gh-release v2.3.2 pinned to commit SHA for supply-chain security
+      uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
       with:
         tag_name: v${{ steps.get_version.outputs.version }}
         name: Release v${{ steps.get_version.outputs.version }}
