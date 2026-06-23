@@ -1,17 +1,10 @@
 package joselusc.libraries.file2file.converters;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import joselusc.libraries.file2file.converters.interfaces.Converter;
 
 /**
  * {@code Csh2ShConverter} is a singleton class that provides functionality to convert
@@ -47,10 +40,14 @@ public class Csh2ShConverter extends AbstractConverter {
     private static final Pattern SETENV_PATTERN = Pattern.compile("^setenv\\s+(\\S+)\\s+(\\S+)");
     private static final Pattern SET_PATTERN = Pattern.compile("^set\\s+(\\S+)\\s*=\\s*(.+)");
     private static final Pattern CD_PATTERN = Pattern.compile("^cd\\s+([^\"].+)$");
-    private static final Pattern IF_GOTO_PATTERN = Pattern.compile("^if\\s*\\((.+)\\)\\s*goto\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$");
-    private static final Pattern IF_NEG_PATTERN = Pattern.compile("^if\\s*!\\(\\s*(.+?)\\s*\\)\\s*then");
-    private static final Pattern IF_PATTERN = Pattern.compile("^if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
-    private static final Pattern ELSE_IF_PATTERN = Pattern.compile("^else\\s+if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
+    private static final Pattern IF_GOTO_PATTERN = Pattern.compile(
+            "^if\\s*\\((.+)\\)\\s*goto\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$");
+    private static final Pattern IF_NEG_PATTERN = Pattern.compile(
+            "^if\\s*!\\(\\s*(.+?)\\s*\\)\\s*then");
+    private static final Pattern IF_PATTERN = Pattern.compile(
+            "^if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
+    private static final Pattern ELSE_IF_PATTERN = Pattern.compile(
+            "^else\\s+if\\s*\\(\\s*\\$?(\\w+)\\s*(==|!=|=|!=)\\s*([\"']?.+?[\"']?)\\s*\\)\\s*then");
     private static final Pattern WHILE_PATTERN = Pattern.compile("^while\\s*\\(\\s*(.+?)\\s*\\)\\s*");
     private static final Pattern FOREACH_PATTERN = Pattern.compile("^foreach\\s+(\\S+)\\s+\\((.+)\\)");
     private static final Pattern SWITCH_PATTERN = Pattern.compile("^switch\\s*\\(\\s*\\$?(\\w+)\\s*\\)");
@@ -140,7 +137,9 @@ public class Csh2ShConverter extends AbstractConverter {
 
             // Preserve blank lines
             if (line.trim().isEmpty()) {
-                if (i < lines.length - 1) writer.append("\n");
+                if (i < lines.length - 1) {
+                    writer.append("\n");
+                }
                 continue;
             }
 
@@ -374,7 +373,8 @@ public class Csh2ShConverter extends AbstractConverter {
             // In Bash, goto is not supported. We can call the function if label exists.
             if (label.matches("^[A-Za-z_][A-Za-z0-9_]*$")) {
                 return label + "  # goto replaced by function call\nreturn";
-            } else if (label.matches("^\\$([A-Za-z_][A-Za-z0-9_]*|[0-9]+|\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\{[0-9]+\\})$")) {
+            } else if (label.matches(
+                    "^\\$([A-Za-z_][A-Za-z0-9_]*|[0-9]+|\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\{[0-9]+\\})$")) {
                 return "\"" + label + "\"\nreturn";
             } else {
                 return "# goto " + label + " (not supported in Bash)";

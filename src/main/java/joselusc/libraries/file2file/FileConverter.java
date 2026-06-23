@@ -4,7 +4,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.commons.cli.*;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 import joselusc.libraries.file2file.converters.interfaces.Converter;
 import joselusc.libraries.file2file.converters.factory.ConverterFactory;
@@ -85,7 +91,7 @@ public class FileConverter {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            System.err.println("Error parsing arguments: " + e.getMessage());
+            LOGGER.severe("Error parsing arguments: " + e.getMessage());
             formatter.printHelp("file2file.jar -t <target_type> <source_path> [target_path]", options);
             System.exit(1);
         }
@@ -99,7 +105,7 @@ public class FileConverter {
         String[] remainingArgs = cmd.getArgs();
 
         if (remainingArgs.length < 1 || remainingArgs.length > 2) {
-            System.err.println("You must specify a source path and optionally a target path.");
+            LOGGER.severe("You must specify a source path and optionally a target path.");
             formatter.printHelp("file2file.jar -t <target_type> <source_path> [target_path]", options);
             System.exit(1);
         }
@@ -127,15 +133,15 @@ public class FileConverter {
                 java.nio.file.Path source = java.nio.file.Path.of(inputFilePath);
                 java.nio.file.Path target = java.nio.file.Path.of(remainingArgs[1]);
                 converter.convert(source, target);
-                System.out.println("Conversion successful: " + target.toAbsolutePath());
+                LOGGER.info("Conversion successful: " + target.toAbsolutePath());
             } else {
                 // Legacy way
                 File outputFile = converter.convert(inputFilePath);
-                System.out.println("Conversion successful: " + outputFile.getAbsolutePath());
+                LOGGER.info("Conversion successful: " + outputFile.getAbsolutePath());
             }
         } catch (IllegalArgumentException | IOException e) {
             LOGGER.log(Level.SEVERE, "Error during conversion", e);
-            System.err.println("Error: " + e.getMessage());
+            LOGGER.severe("Error: " + e.getMessage());
             System.exit(1);
         }
     }

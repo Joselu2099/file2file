@@ -7,9 +7,12 @@ import java.util.Stack;
 
 public class BatchToBashConverter extends AbstractConverter {
 
-    private static final Pattern SET_PATTERN = Pattern.compile("^set\\s+([a-zA-Z0-9_]+)=(.+)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IF_PATTERN = Pattern.compile("^if\\s+(not\\s+)?(exist\\s+)?(.+?)\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FOR_PATTERN = Pattern.compile("^for\\s+%%([a-zA-Z])\\s+in\\s+\\((.*)\\)\\s*do\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SET_PATTERN = Pattern.compile(
+            "^set\\s+([a-zA-Z0-9_]+)=(.+)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IF_PATTERN = Pattern.compile(
+            "^if\\s+(not\\s+)?(exist\\s+)?(.+?)\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FOR_PATTERN = Pattern.compile(
+            "^for\\s+%%([a-zA-Z])\\s+in\\s+\\((.*)\\)\\s*do\\s*(\\(?)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern VAR_PATTERN = Pattern.compile("%([a-zA-Z0-9_]+)%");
     private static final Pattern INDENT_PATTERN = Pattern.compile("^(\\s*)");
 

@@ -3,14 +3,12 @@ package joselusc.libraries.file2file.converters;
 import joselusc.libraries.file2file.converters.interfaces.Converter;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.FileVisitResult;
-import java.util.stream.Stream;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 import java.nio.file.FileSystems;
@@ -27,9 +25,13 @@ public abstract class AbstractConverter implements Converter {
         }
     }
     protected boolean isExcluded(Path path) {
-        if (excludes == null || excludes.isEmpty()) return false;
+        if (excludes == null || excludes.isEmpty()) {
+            return false;
+        }
         Path fileNamePath = path.getFileName();
-        if (fileNamePath == null) return false;
+        if (fileNamePath == null) {
+            return false;
+        }
         String fileName = fileNamePath.toString();
         for (String pattern : excludes) {
             if (fileName.equals(pattern)) {
@@ -193,16 +195,16 @@ public abstract class AbstractConverter implements Converter {
         String converted = convertContent(content);
 
         if (dryRun) {
-            System.out.println("--- Dry Run: " + source + " -> " + target + " ---");
-            System.out.println(generateSimpleDiff(content, converted));
-            System.out.println("--------------------------------------------------\n");
+            LOGGER.info("--- Dry Run: " + source + " -> " + target + " ---");
+            LOGGER.info(generateSimpleDiff(content, converted));
+            LOGGER.info("--------------------------------------------------\n");
             return;
         }
 
         if (backup && Files.exists(target)) {
             Path backupFile = target.resolveSibling(target.getFileName().toString() + ".bak");
             Files.copy(target, backupFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("Created backup: " + backupFile);
+            LOGGER.info("Created backup: " + backupFile);
         }
 
         Files.write(target, converted.getBytes(charset));

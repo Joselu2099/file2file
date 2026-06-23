@@ -39,7 +39,9 @@ public class PropertiesToYamlConverter extends AbstractConverter {
 
             for (int i = 0; i < parts.length - 1; i++) {
                 String part = parts[i];
-                if (part.isEmpty()) continue;
+                if (part.isEmpty()) {
+                    continue;
+                }
 
                 Object existing = currentMap.get(part);
 

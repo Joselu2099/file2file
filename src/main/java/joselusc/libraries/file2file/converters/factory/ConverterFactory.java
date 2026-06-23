@@ -39,7 +39,7 @@ public class ConverterFactory {
      * the inner map key is the target type, and the value is a {@link Supplier}
      * that provides an instance of the corresponding {@link Converter}.
      */
-    private static final Map<String, Map<String, Supplier<Converter>>> converters = new HashMap<>();
+    private static final Map<String, Map<String, Supplier<Converter>>> CONVERTERS = new HashMap<>();
 
     static {
         // Register the CSH to SH converter using a Supplier
@@ -75,7 +75,7 @@ public class ConverterFactory {
      * @param converterSupplier A supplier function that provides an instance of the converter
      */
     public static void registerConverter(String inputExt, String outputExt, Supplier<Converter> converterSupplier) {
-        converters.computeIfAbsent(inputExt, k -> new HashMap<>()).put(outputExt, converterSupplier);
+        CONVERTERS.computeIfAbsent(inputExt, k -> new HashMap<>()).put(outputExt, converterSupplier);
     }
 
     /**
@@ -89,11 +89,11 @@ public class ConverterFactory {
     public static Converter getConverter(String inputFile, String targetType) throws IllegalArgumentException {
         String extension = getFileExtension(inputFile);
 
-        if (extension == null || !converters.containsKey(extension)) {
+        if (extension == null || !CONVERTERS.containsKey(extension)) {
             throw new IllegalArgumentException("No available converters for " + inputFile);
         }
 
-        Map<String, Supplier<Converter>> targetConverters = converters.get(extension);
+        Map<String, Supplier<Converter>> targetConverters = CONVERTERS.get(extension);
         if (targetConverters.containsKey(targetType)) {
             return targetConverters.get(targetType).get(); // Use the Supplier to get an instance
         }

@@ -11,7 +11,8 @@ public class PowerShellToBashConverter extends AbstractConverter {
     private static final Pattern VAR_PATTERN = Pattern.compile("^\\$([a-zA-Z0-9_]+)\\s*=\\s*(.*)$");
     private static final Pattern IF_PATTERN = Pattern.compile("^if\\s*\\((.*)\\)\\s*\\{?$");
     private static final Pattern ELSEIF_PATTERN = Pattern.compile("^elseif\\s*\\((.*)\\)\\s*\\{?$");
-    private static final Pattern FOREACH_PATTERN = Pattern.compile("^foreach\\s*\\(\\$([a-zA-Z0-9_]+)\\s+in\\s+(.*)\\)\\s*\\{?$");
+    private static final Pattern FOREACH_PATTERN = Pattern.compile(
+            "^foreach\\s*\\(\\$([a-zA-Z0-9_]+)\\s+in\\s+(.*)\\)\\s*\\{?$");
     private static final Pattern FUNC_PATTERN = Pattern.compile("^function\\s+([a-zA-Z0-9_]+)\\s*\\{?$");
 
     private Stack<String> blockStack = new Stack<>();

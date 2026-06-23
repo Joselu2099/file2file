@@ -10,7 +10,8 @@ import java.util.regex.Matcher;
 public class Python2To3Converter extends AbstractConverter {
 
     private static final Pattern PRINT_PATTERN = Pattern.compile("^(\\s*)print\\s+(.*)$");
-    private static final Pattern EXCEPT_PATTERN = Pattern.compile("^(\\s*)except\\s+([A-Za-z0-9_]+)\\s*,\\s*([A-Za-z0-9_]+)\\s*:$");
+    private static final Pattern EXCEPT_PATTERN = Pattern.compile(
+            "^(\\s*)except\\s+([A-Za-z0-9_]+)\\s*,\\s*([A-Za-z0-9_]+)\\s*:$");
 
     @Override
     protected String getTargetExtension() {

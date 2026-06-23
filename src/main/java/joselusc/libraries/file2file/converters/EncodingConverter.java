@@ -1,13 +1,22 @@
 package joselusc.libraries.file2file.converters;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import joselusc.libraries.file2file.converters.interfaces.Converter;
 
 /**
  * Utility class for converting the character encoding of text files within a directory tree.
@@ -26,7 +35,8 @@ import joselusc.libraries.file2file.converters.interfaces.Converter;
  * <p>
  * <b>Command-line usage:</b>
  * <pre>
- *   java EncodingConverter &lt;directory&gt; &lt;sourceEncoding&gt; &lt;targetEncoding&gt; [-ext=ext1,ext2,...] [-nobak] [-silent]
+ *   java EncodingConverter &lt;directory&gt; &lt;sourceEncoding&gt;
+ *       &lt;targetEncoding&gt; [-ext=ext1,ext2,...] [-nobak] [-silent]
  *   Example: java EncodingConverter ./project windows-1252 UTF-8 -ext=.java,.js,.jsp -nobak -silent
  * </pre>
  * </p>
@@ -60,7 +70,9 @@ public class EncodingConverter extends AbstractConverter {
     protected boolean acceptFile(Path file) {
         String fileName = file.getFileName().toString().toLowerCase();
         for (String ext : DEFAULT_EXTENSIONS) {
-            if (fileName.endsWith(ext)) return true;
+            if (fileName.endsWith(ext)) {
+                return true;
+            }
         }
         return false;
     }
@@ -112,16 +124,15 @@ public class EncodingConverter extends AbstractConverter {
 
     /**
      * Command-line entry point for the encoding converter.
-     * <p>
-     * Usage:
+     * <b>Command-line usage:</b>
      * <pre>
-     *   java EncodingConverter &lt;directory&gt; &lt;sourceEncoding&gt; &lt;targetEncoding&gt; [-ext=ext1,ext2,...] [-nobak] [-silent]
+     *   java EncodingConverter &lt;directory&gt; &lt;sourceEncoding&gt;
+     *       &lt;targetEncoding&gt; [-ext=ext1,ext2,...] [-nobak] [-silent]
      * </pre>
      * Example:
      * <pre>
      *   java EncodingConverter ./project windows-1252 UTF-8 -ext=.java,.js,.jsp -nobak -silent
      * </pre>
-     * </p>
      *
      * @param args command-line arguments
      */
@@ -145,7 +156,9 @@ public class EncodingConverter extends AbstractConverter {
                 String[] exts = arg.substring(5).split(",");
                 extensions = new ArrayList<>();
                 for (String ext : exts) {
-                    if (!ext.startsWith(".")) ext = "." + ext;
+                    if (!ext.startsWith(".")) {
+                        ext = "." + ext;
+                    }
                     extensions.add(ext.toLowerCase());
                 }
             } else if (arg.equalsIgnoreCase("-nobak")) {
@@ -159,13 +172,15 @@ public class EncodingConverter extends AbstractConverter {
             sourceEncoding = Charset.forName(args[1]);
             targetEncoding = Charset.forName(args[2]);
         } catch (Exception e) {
-            System.out.println("Unsupported encoding: " + e.getMessage());
+            LOGGER.severe("Unsupported encoding: " + e.getMessage());
             return;
         }
 
         try {
             convertDirectory(root, sourceEncoding, targetEncoding, extensions, backup, silent);
-            if (!silent) System.out.println("Conversion finished.");
+            if (!silent) {
+                LOGGER.info("Conversion finished.");
+            }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error during directory conversion", e);
         }
@@ -175,9 +190,12 @@ public class EncodingConverter extends AbstractConverter {
      * Prints the help message for command-line usage.
      */
     private static void printHelp() {
-        System.out.println("Usage: java EncodingConverter <directory> <sourceEncoding> <targetEncoding> [-ext=ext1,ext2,...] [-nobak] [-silent]");
-        System.out.println("Example: java EncodingConverter ./project windows-1252 UTF-8 -ext=.java,.js,.jsp -nobak -silent");
-        System.out.println("By default, creates .bak backups and converts .java,.js,.jsp,.xhtml,.html,.sql files.");
+        LOGGER.info("Usage: java EncodingConverter <directory> <sourceEncoding> <targetEncoding> "
+                + "[-ext=ext1,ext2,...] [-nobak] [-silent]");
+        LOGGER.info("Example: java EncodingConverter ./project windows-1252 UTF-8 "
+                + "-ext=.java,.js,.jsp -nobak -silent");
+        LOGGER.info("By default, creates .bak backups and converts "
+                + ".java,.js,.jsp,.xhtml,.html,.sql files.");
     }
 
     /**
@@ -191,11 +209,15 @@ public class EncodingConverter extends AbstractConverter {
     private static List<File> listFilesRecursively(File dir, List<String> extensions) {
         List<File> result = new ArrayList<>();
         File[] files = dir.listFiles();
-        if (files == null) return result;
+        if (files == null) {
+            return result;
+        }
 
         for (File file : files) {
             if (file.isDirectory()) {
-                if (EXCLUDED_DIRS.contains(file.getName())) continue;
+                if (EXCLUDED_DIRS.contains(file.getName())) {
+                    continue;
+                }
                 result.addAll(listFilesRecursively(file, extensions));
             } else {
                 for (String ext : extensions) {
@@ -248,10 +270,13 @@ public class EncodingConverter extends AbstractConverter {
             }
 
             // Write the content with the target encoding
-            try (OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(file, false), targetEncoding)) {
+            try (OutputStreamWriter writer = new OutputStreamWriter(
+                    new FileOutputStream(file, false), targetEncoding)) {
                 writer.write(content);
             }
-            if (!silent) System.out.println("Converted: " + file.getPath());
+            if (!silent) {
+                LOGGER.info("Converted: " + file.getPath());
+            }
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Error converting file: " + file.getPath(), e);
         }

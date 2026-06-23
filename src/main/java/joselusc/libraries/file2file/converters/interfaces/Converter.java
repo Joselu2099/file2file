@@ -51,7 +51,8 @@ public interface Converter {
     default File convert(String inputPath) throws IOException {
         Path source = Path.of(inputPath);
 
-        // This is a hack to preserve backward compatibility for Csh2ShConverter's specific checks before checking for file existence
+        // This is a hack to preserve backward compatibility for Csh2ShConverter's specific checks
+        // before checking for file existence
         if (this.getClass().getSimpleName().equals("Csh2ShConverter") && !inputPath.endsWith(".csh")) {
             throw new IllegalArgumentException("Expected a .csh file");
         }

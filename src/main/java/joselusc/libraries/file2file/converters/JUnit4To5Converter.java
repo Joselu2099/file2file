@@ -32,19 +32,27 @@ public class JUnit4To5Converter extends AbstractConverter {
         // Annotations
         line = line.replace("@Before\n", "@BeforeEach\n");
         line = line.replace("@Before ", "@BeforeEach ");
-        if (line.trim().equals("@Before")) line = line.replace("@Before", "@BeforeEach");
+        if (line.trim().equals("@Before")) {
+            line = line.replace("@Before", "@BeforeEach");
+        }
 
         line = line.replace("@After\n", "@AfterEach\n");
         line = line.replace("@After ", "@AfterEach ");
-        if (line.trim().equals("@After")) line = line.replace("@After", "@AfterEach");
+        if (line.trim().equals("@After")) {
+            line = line.replace("@After", "@AfterEach");
+        }
 
         line = line.replace("@BeforeClass\n", "@BeforeAll\n");
         line = line.replace("@BeforeClass ", "@BeforeAll ");
-        if (line.trim().equals("@BeforeClass")) line = line.replace("@BeforeClass", "@BeforeAll");
+        if (line.trim().equals("@BeforeClass")) {
+            line = line.replace("@BeforeClass", "@BeforeAll");
+        }
 
         line = line.replace("@AfterClass\n", "@AfterAll\n");
         line = line.replace("@AfterClass ", "@AfterAll ");
-        if (line.trim().equals("@AfterClass")) line = line.replace("@AfterClass", "@AfterAll");
+        if (line.trim().equals("@AfterClass")) {
+            line = line.replace("@AfterClass", "@AfterAll");
+        }
 
         line = line.replace("@Ignore", "@Disabled");
 
@@ -66,11 +74,13 @@ public class JUnit4To5Converter extends AbstractConverter {
 
         // Very basic substitution for the @Test(expected=...)
         // It's hard to wrap the block without a parser, so we just remove it and add a comment
-        java.util.regex.Pattern p = java.util.regex.Pattern.compile("@Test\\s*\\(\\s*expected\\s*=\\s*([^\\)]+)\\s*\\)");
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                "@Test\\s*\\(\\s*expected\\s*=\\s*([^\\)]+)\\s*\\)");
         java.util.regex.Matcher m = p.matcher(converted);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
-            m.appendReplacement(sb, "@Test // TODO: manually wrap with Assertions.assertThrows(" + m.group(1) + ", () -> { ... });");
+            m.appendReplacement(sb, "@Test // TODO: manually wrap with Assertions.assertThrows("
+                    + m.group(1) + ", () -> { ... });");
         }
         m.appendTail(sb);
         converted = sb.toString();

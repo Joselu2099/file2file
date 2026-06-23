@@ -10,7 +10,8 @@ import java.util.regex.Matcher;
  */
 public class JavaModernizerConverter extends AbstractConverter {
 
-    private static final Pattern DIAMOND_PATTERN = Pattern.compile("(=[\\s]*new[\\s]+[A-Za-z0-9_]+)<[A-Za-z0-9_,\\s\\?]+>\\s*\\(");
+    private static final Pattern DIAMOND_PATTERN = Pattern.compile(
+            "(=[\\s]*new[\\s]+[A-Za-z0-9_]+)<[A-Za-z0-9_,\\s\\?]+>\\s*\\(");
 
     @Override
     protected String getTargetExtension() {
@@ -36,8 +37,10 @@ public class JavaModernizerConverter extends AbstractConverter {
         // "..." + \n "..." -> """..."""
         boolean changed = true;
         while (changed) {
-            String newContent = result.replaceAll("\"([^\"]*)\"\\s*\\+\\s*\\r?\\n\\s*\"([^\"]*)\"", "\"\"\"\n$1$2\"\"\"");
-            newContent = newContent.replaceAll("\"\"\"([\\s\\S]*?)\"\"\"\\s*\\+\\s*\\r?\\n\\s*\"([^\"]*)\"", "\"\"\"$1$2\"\"\"");
+            String newContent = result.replaceAll(
+                    "\"([^\"]*)\"\\s*\\+\\s*\\r?\\n\\s*\"([^\"]*)\"", "\"\"\"\n$1$2\"\"\"");
+            newContent = newContent.replaceAll(
+                    "\"\"\"([\\s\\S]*?)\"\"\"\\s*\\+\\s*\\r?\\n\\s*\"([^\"]*)\"", "\"\"\"$1$2\"\"\"");
             if (newContent.equals(result)) {
                 changed = false;
             } else {
@@ -49,7 +52,8 @@ public class JavaModernizerConverter extends AbstractConverter {
         // public class Point { private final int x; public Point(int x) { this.x = x; } }
         // -> public record Point(int x) {}
         result = result.replaceAll(
-            "public\\s+class\\s+([A-Za-z0-9_]+)\\s*\\{\\s*private\\s+final\\s+([A-Za-z0-9_]+)\\s+([A-Za-z0-9_]+);\\s*public\\s+\\1\\s*\\(\\2\\s+\\3\\)\\s*\\{\\s*this\\.\\3\\s*=\\s*\\3;\\s*\\}\\s*\\}",
+            "public\\s+class\\s+([A-Za-z0-9_]+)\\s*\\{\\s*private\\s+final\\s+([A-Za-z0-9_]+)\\s+"
+            + "([A-Za-z0-9_]+);\\s*public\\s+\\1\\s*\\(\\2\\s+\\3\\)\\s*\\{\\s*this\\.\\3\\s*=\\s*\\3;\\s*\\}\\s*\\}",
             "public record $1($2 $3) {}"
         );
 
