@@ -31,8 +31,8 @@
         <module name="EmptyBlock"/>
 
         <module name="RegexpSinglelineJava">
-            <property name="format" value="System\.(out|err)\.print"/>
-            <property name="message" value="Usa Logger en lugar de System.out o System.err para imprimir en consola."/>
+            <property name="format" value="System\.(out|err)\.(print|write)|System\.(out|err)::"/>
+            <property name="message" value="Use Logger instead of System.out or System.err to print to the console."/>
             <property name="ignoreComments" value="true"/>
         </module>
     </module>
