@@ -8,29 +8,40 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileSystemView;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.dnd.*;
+import java.awt.datatransfer.DataFlavor;
 import java.io.File;
-import java.text.SimpleDateFormat;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.*;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.prefs.Preferences;
 
 public class File2FileGUI extends JFrame {
 
     private static final Logger LOGGER = Logger.getLogger(File2FileGUI.class.getName());
 
+    private static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 22);
+    private static final Font FONT_NORMAL = new Font("Segoe UI", Font.PLAIN, 14);
+    private static final Font FONT_LABEL = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final Font FONT_BOLD15 = new Font("Segoe UI", Font.BOLD, 15);
+    private static final Color COLOR_PRIMARY = new Color(0, 120, 215);
+    private static final Color DROP_HIGHLIGHT = new Color(220, 235, 250);
+
+    private static final Preferences PREFS = Preferences.userNodeForPackage(File2FileGUI.class);
+    private static final String KEY_LAST_FILE = "lastFile";
+
     private JTextField fileField;
+    private Color fileFieldBg;
     private JComboBox<String> converterCombo;
     private JButton browseButton, convertButton;
+    private JProgressBar progressBar;
 
     public File2FileGUI() {
         super("File2File Converter");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(520, 240);
+        setSize(520, 270);
         setLocationRelativeTo(null);
         setResizable(false);
 
@@ -48,20 +59,24 @@ public class File2FileGUI extends JFrame {
         content.setBackground(Color.WHITE);
 
         JLabel title = new JLabel("File2File Converter");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        title.setFont(FONT_TITLE);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
         content.add(title);
 
         content.add(Box.createVerticalStrut(20));
 
         converterCombo = new JComboBox<>(new String[]{"CSH to SH", "Encoding"});
-        converterCombo.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        converterCombo.setFont(FONT_NORMAL);
         converterCombo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
         content.add(new LabeledPanel("Converter", converterCombo));
 
-        fileField = new JTextField();
+        fileField = new JTextField(PREFS.get(KEY_LAST_FILE, ""));
         fileField.setEditable(false);
-        fileField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        fileField.setFont(FONT_NORMAL);
+        fileFieldBg = fileField.getBackground();
+
+        setupDragAndDrop();
+
         browseButton = new JButton("...");
         browseButton.addActionListener(this::onBrowse);
 
@@ -74,32 +89,208 @@ public class File2FileGUI extends JFrame {
         content.add(Box.createVerticalStrut(20));
 
         convertButton = new JButton("Convert");
-        convertButton.setFont(new Font("Segoe UI", Font.BOLD, 15));
-        convertButton.setBackground(new Color(0, 120, 215));
+        convertButton.setFont(FONT_BOLD15);
+        convertButton.setBackground(COLOR_PRIMARY);
         convertButton.setForeground(Color.WHITE);
         convertButton.setFocusPainted(false);
         convertButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         convertButton.addActionListener(this::onConvert);
         content.add(convertButton);
 
+        progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setVisible(false);
+        content.add(Box.createVerticalStrut(10));
+        content.add(progressBar);
+
         setContentPane(content);
     }
 
     private void onBrowse(ActionEvent e) {
-        JFileChooser chooser = new JFileChooser() {
+        class FilteringFileSystemView extends FileSystemView {
+            private final FileSystemView delegate = FileSystemView.getFileSystemView();
+            private String filterText = "";
+
+            public void setFilterText(String text) {
+                filterText = text == null ? "" : text.toLowerCase();
+            }
+
+            @Override
+            public File createNewFolder(File containingDir) throws java.io.IOException {
+                return delegate.createNewFolder(containingDir);
+            }
+
+            @Override
+            public File[] getRoots() {
+                return delegate.getRoots();
+            }
+
+            @Override
+            public File getHomeDirectory() {
+                return delegate.getHomeDirectory();
+            }
+
+            @Override
+            public File getDefaultDirectory() {
+                return delegate.getDefaultDirectory();
+            }
+
+            @Override
+            public File createFileObject(File dir, String filename) {
+                return delegate.createFileObject(dir, filename);
+            }
+
+            @Override
+            public File createFileObject(String path) {
+                return delegate.createFileObject(path);
+            }
+
+            @Override
+            public File[] getFiles(File dir, boolean useFileHiding) {
+                File[] files = delegate.getFiles(dir, useFileHiding);
+                if (filterText.isEmpty()) {
+                    return files;
+                }
+                java.util.List<File> filtered = new java.util.ArrayList<>();
+                for (File f : files) {
+                    if (f.getName().toLowerCase().contains(filterText)) {
+                        filtered.add(f);
+                    }
+                }
+                return filtered.toArray(new File[0]);
+            }
+
+            @Override
+            public File getParentDirectory(File dir) {
+                return delegate.getParentDirectory(dir);
+            }
+
+            public File[] getChooserComboBoxFiles() {
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod("getChooserComboBoxFiles");
+                    return (File[]) m.invoke(delegate);
+                } catch (Exception ex) {
+                    return null;
+                }
+            }
+
+            @Override
+            public boolean isFileSystemRoot(File f) {
+                return delegate.isFileSystemRoot(f);
+            }
+
+            @Override
+            public boolean isDrive(File dir) {
+                return delegate.isDrive(dir);
+            }
+
+            @Override
+            public boolean isFloppyDrive(File dir) {
+                return delegate.isFloppyDrive(dir);
+            }
+
+            @Override
+            public boolean isComputerNode(File dir) {
+                return delegate.isComputerNode(dir);
+            }
+
+            @Override
+            public boolean isFileSystem(File f) {
+                return delegate.isFileSystem(f);
+            }
+
+            @Override
+            public boolean isHiddenFile(File f) {
+                return delegate.isHiddenFile(f);
+            }
+
+            @Override
+            public boolean isRoot(File f) {
+                return delegate.isRoot(f);
+            }
+
+            @Override
+            public Boolean isTraversable(File f) {
+                return delegate.isTraversable(f);
+            }
+
+            @Override
+            public String getSystemDisplayName(File f) {
+                return delegate.getSystemDisplayName(f);
+            }
+
+            @Override
+            public String getSystemTypeDescription(File f) {
+                return delegate.getSystemTypeDescription(f);
+            }
+
+            @Override
+            public Icon getSystemIcon(File f) {
+                return delegate.getSystemIcon(f);
+            }
+
+            public Icon getSystemIcon(File f, int width, int height) {
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod(
+                            "getSystemIcon", File.class, int.class, int.class);
+                    return (Icon) m.invoke(delegate, f, width, height);
+                } catch (Exception ex) {
+                    return delegate.getSystemIcon(f);
+                }
+            }
+
+            @Override
+            public boolean isParent(File folder, File file) {
+                return delegate.isParent(folder, file);
+            }
+
+            @Override
+            public File getChild(File parent, String fileName) {
+                return delegate.getChild(parent, fileName);
+            }
+
+            public boolean isLink(File f) {
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod("isLink", File.class);
+                    return (Boolean) m.invoke(delegate, f);
+                } catch (Exception ex) {
+                    return false;
+                }
+            }
+
+            public File getLinkLocation(File f) throws java.io.FileNotFoundException {
+                try {
+                    java.lang.reflect.Method m = FileSystemView.class.getMethod("getLinkLocation", File.class);
+                    return (File) m.invoke(delegate, f);
+                } catch (Exception ex) {
+                    return f;
+                }
+            }
+        }
+
+        FilteringFileSystemView fsv = new FilteringFileSystemView();
+
+        JFileChooser chooser = new JFileChooser(fsv) {
             @Override
             public void approveSelection() {
                 File selected = getSelectedFile();
                 if (selected != null && selected.isFile()) {
-                    fileField.setText(selected.getAbsolutePath());
+                    File2FileGUI.this.setSelectedFile(selected);
                 }
                 super.approveSelection();
             }
         };
 
+        String last = PREFS.get(KEY_LAST_FILE, null);
+        if (last != null) {
+            File f = new File(last);
+            if (f.getParentFile() != null && f.getParentFile().exists()) {
+                chooser.setCurrentDirectory(f.getParentFile());
+            }
+        }
+
         chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        chooser.setAcceptAllFileFilterUsed(false);
-        File initialDir = chooser.getCurrentDirectory();
+        chooser.setAcceptAllFileFilterUsed(true);
 
         JPanel accessory = new JPanel(new BorderLayout(5, 5));
         accessory.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -108,8 +299,8 @@ public class File2FileGUI extends JFrame {
         JLabel filterLabel = new JLabel("Filter:");
         JTextField filterField = new JTextField();
 
-        filterLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        filterField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        filterLabel.setFont(FONT_LABEL);
+        filterField.setFont(FONT_NORMAL);
         filterField.setBackground(new Color(245, 245, 245));
         filterField.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200)),
@@ -119,28 +310,7 @@ public class File2FileGUI extends JFrame {
         accessory.add(filterLabel, BorderLayout.NORTH);
         accessory.add(filterField, BorderLayout.CENTER);
         chooser.setAccessory(accessory);
-
-        // Filtro personalizado con estado
-        class DynamicFilter extends FileFilter {
-            private String filterText = "";
-
-            public void setFilterText(String text) {
-                this.filterText = text.toLowerCase();
-            }
-
-            @Override
-            public boolean accept(File f) {
-                return f.isDirectory() || f.getName().toLowerCase().contains(filterText);
-            }
-
-            @Override
-            public String getDescription() {
-                return "Filtered files";
-            }
-        }
-
-        DynamicFilter dynamicFilter = new DynamicFilter();
-        chooser.setFileFilter(dynamicFilter);
+        SwingUtilities.invokeLater(() -> filterField.requestFocusInWindow());
 
         filterField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { update(); }
@@ -148,14 +318,82 @@ public class File2FileGUI extends JFrame {
             public void changedUpdate(DocumentEvent e) { update(); }
 
             private void update() {
-                dynamicFilter.setFilterText(filterField.getText());
+                fsv.setFilterText(filterField.getText());
                 chooser.rescanCurrentDirectory();
             }
         });
 
-        chooser.showOpenDialog(this);
+        int result = chooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File chosen = chooser.getSelectedFile();
+            if (chosen != null && chosen.isFile()) {
+                setSelectedFile(chosen);
+            }
+        }
     }
-    
+
+    private void setupDragAndDrop() {
+        new DropTarget(fileField, new DropTargetAdapter() {
+            @Override
+            public void dragEnter(DropTargetDragEvent dtde) {
+                if (isSingleFile(dtde)) {
+                    dtde.acceptDrag(DnDConstants.ACTION_COPY);
+                    fileField.setBackground(DROP_HIGHLIGHT);
+                } else {
+                    dtde.rejectDrag();
+                }
+            }
+
+            @Override
+            public void dragExit(DropTargetEvent dte) {
+                fileField.setBackground(fileFieldBg);
+            }
+
+            @Override
+            public void drop(DropTargetDropEvent dtde) {
+                fileField.setBackground(fileFieldBg);
+                if (isSingleFile(dtde)) {
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                    try {
+                        @SuppressWarnings("unchecked")
+                        java.util.List<File> files = (java.util.List<File>) dtde.getTransferable()
+                                .getTransferData(DataFlavor.javaFileListFlavor);
+                        File f = files.get(0);
+                        if (f.isFile()) {
+                            setSelectedFile(f);
+                            dtde.dropComplete(true);
+                            return;
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                dtde.rejectDrop();
+                dtde.dropComplete(false);
+            }
+        });
+    }
+
+    private static boolean isSingleFile(DropTargetDragEvent e) {
+        return isSingleFile(e.getTransferable());
+    }
+
+    private static boolean isSingleFile(DropTargetDropEvent e) {
+        return isSingleFile(e.getTransferable());
+    }
+
+    private static boolean isSingleFile(java.awt.datatransfer.Transferable t) {
+        if (!t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+            return false;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.List<File> files = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
+            return files.size() == 1 && files.get(0).isFile();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void onConvert(ActionEvent e) {
         String filePath = fileField.getText();
         if (filePath.isEmpty()) {
@@ -166,23 +404,42 @@ public class File2FileGUI extends JFrame {
         String selectedConverter = (String) converterCombo.getSelectedItem();
         String targetType = selectedConverter.equals("CSH to SH") ? "sh" : "encoding";
 
-        try {
-            Converter converter = ConverterFactory.getConverter(filePath, targetType);
-            if (converter == null) {
-                JOptionPane.showMessageDialog(this, "No converter found for this type.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
+        progressBar.setVisible(true);
+        convertButton.setEnabled(false);
+
+        new SwingWorker<File, Void>() {
+            @Override
+            protected File doInBackground() throws Exception {
+                Converter converter = ConverterFactory.getConverter(filePath, targetType);
+                if (converter == null) {
+                    throw new IllegalArgumentException("No converter found for this type.");
+                }
+                return converter.convert(filePath);
             }
-            File output = converter.convert(filePath);
-            File renamed = new File(getConvertedFileName(filePath, targetType));
-            if (output.renameTo(renamed)) {
-                JOptionPane.showMessageDialog(this, "Conversion successful:\n" + renamed.getAbsolutePath(), "Success", JOptionPane.INFORMATION_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(this, "Conversion done, but could not rename the file.", "Warning", JOptionPane.WARNING_MESSAGE);
+
+            @Override
+            protected void done() {
+                progressBar.setVisible(false);
+                convertButton.setEnabled(true);
+                try {
+                    File output = get();
+                    File renamed = new File(getConvertedFileName(filePath, targetType));
+                    if (output.renameTo(renamed)) {
+                        JOptionPane.showMessageDialog(File2FileGUI.this,
+                                "Conversion successful:\n" + renamed.getAbsolutePath(),
+                                "Success", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(File2FileGUI.this,
+                                "Conversion done, but could not rename the file.",
+                                "Warning", JOptionPane.WARNING_MESSAGE);
+                    }
+                } catch (Exception ex) {
+                    LOGGER.log(Level.SEVERE, "Error during conversion", ex);
+                    JOptionPane.showMessageDialog(File2FileGUI.this,
+                            "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
             }
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "Error during conversion", ex);
-            JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        }.execute();
     }
 
     private String getConvertedFileName(String originalPath, String targetType) {
@@ -194,6 +451,12 @@ public class File2FileGUI extends JFrame {
         return new File(original.getParent(), base + "_CONVERTED" + ext).getAbsolutePath();
     }
 
+    private void setSelectedFile(File file) {
+        String path = file.getAbsolutePath();
+        fileField.setText(path);
+        PREFS.put(KEY_LAST_FILE, path);
+    }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new File2FileGUI().setVisible(true));
     }
@@ -203,7 +466,7 @@ public class File2FileGUI extends JFrame {
             setLayout(new BorderLayout(5, 5));
             setBackground(Color.WHITE);
             JLabel label = new JLabel(labelText);
-            label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            label.setFont(FONT_LABEL);
             add(label, BorderLayout.NORTH);
             add(field, BorderLayout.CENTER);
         }

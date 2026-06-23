@@ -7,6 +7,9 @@ import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.FileVisitResult;
 import java.util.stream.Stream;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -107,8 +110,20 @@ public abstract class AbstractConverter implements Converter {
                 throw new IOException("Target exists but is not a directory: " + target);
             }
 
-            try (Stream<Path> stream = Files.walk(source)) {
-                stream.forEach(p -> {
+            Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (isExcluded(dir)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path p, BasicFileAttributes attrs) throws IOException {
+                    if (isExcluded(p)) {
+                        return FileVisitResult.CONTINUE;
+                    }
                     try {
                         if (Files.isRegularFile(p) && acceptFile(p)) {
                             Path relative = source.relativize(p);
@@ -134,8 +149,15 @@ public abstract class AbstractConverter implements Converter {
                     } catch (IOException e) {
                         LOGGER.log(Level.SEVERE, "Failed to convert file " + p, e);
                     }
-                });
-            }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+                    LOGGER.log(Level.SEVERE, "Failed to visit file " + file, exc);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } else {
             Path targetFile = target;
             if (Files.isDirectory(target)) {
