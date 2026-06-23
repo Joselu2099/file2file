@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: Extract version from pom.xml
+      id: get_version
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Check if tag exists
+      id: check_tag
+      run: |
+        TAG="v${{ steps.get_version.outputs.version }}"
+        if git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+          echo "tag_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "tag_exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build project
+      if: steps.check_tag.outputs.tag_exists == 'false'
+      run: mvn -B clean package -DskipTests
+
+    - name: Prepare release assets
+      if: steps.check_tag.outputs.tag_exists == 'false'
+      id: prepare_assets
+      run: |
+        VERSION=${{ steps.get_version.outputs.version }}
+        JAR_NAME="file2file-v${VERSION}.jar"
+        SHADED=$(find target -maxdepth 1 -name "*-jar-with-dependencies.jar" | head -n 1)
+        if [ -z "$SHADED" ]; then
+          SHADED=$(find target -maxdepth 1 -name "file2file-*.jar" ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -n 1)
+        fi
+        cp "$SHADED" "target/${JAR_NAME}"
+        sha256sum "target/${JAR_NAME}" > "target/${JAR_NAME}.sha256"
+        echo "jar_path=target/${JAR_NAME}" >> $GITHUB_OUTPUT
+        echo "sha256_path=target/${JAR_NAME}.sha256" >> $GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      if: steps.check_tag.outputs.tag_exists == 'false'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: Release v${{ steps.get_version.outputs.version }}
+        generate_release_notes: true
+        files: |
+          ${{ steps.prepare_assets.outputs.jar_path }}
+          ${{ steps.prepare_assets.outputs.sha256_path }}
